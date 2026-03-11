@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StoryForge — Your Creative Writing Studio</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Pro:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- SPLASH / PROJECTS SCREEN -->
+  <div id="splash-screen" class="screen active">
+    <div class="splash-bg"></div>
+    <div class="splash-content">
+      <div class="splash-logo">
+        <span class="logo-icon">✦</span>
+        <h1>StoryForge</h1>
+        <p class="logo-tagline">Where worlds are written</p>
+      </div>
+      <div class="projects-section">
+        <div class="projects-header">
+          <h2>Your Projects</h2>
+          <button class="btn-primary" id="new-project-btn">+ New Project</button>
+        </div>
+        <div id="projects-grid" class="projects-grid">
+          <!-- Populated by JS -->
+        </div>
+        <div id="no-projects" class="no-projects hidden">
+          <span class="no-proj-icon">📖</span>
+          <p>No projects yet. Start your first story!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW PROJECT MODAL -->
+  <div id="new-project-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>New Project</h3>
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="proj-title-input" placeholder="The Name of the Wind…" />
+      </div>
+      <div class="form-group">
+        <label>Genre</label>
+        <select id="proj-genre-input">
+          <option value="Fantasy">Fantasy</option>
+          <option value="Sci-Fi">Sci-Fi</option>
+          <option value="Romance">Romance</option>
+          <option value="Thriller">Thriller</option>
+          <option value="Mystery">Mystery</option>
+          <option value="Horror">Horror</option>
+          <option value="Literary Fiction">Literary Fiction</option>
+          <option value="Historical Fiction">Historical Fiction</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Synopsis <span class="optional">(optional)</span></label>
+        <textarea id="proj-synopsis-input" placeholder="A brief description of your story…" rows="3"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="cancel-project-btn">Cancel</button>
+        <button class="btn-primary" id="create-project-btn">Create Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT PROJECT MODAL -->
+  <div id="edit-project-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Edit Project</h3>
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="edit-proj-title-input" placeholder="Project title…" />
+      </div>
+      <div class="form-group">
+        <label>Genre</label>
+        <select id="edit-proj-genre-input">
+          <option value="Fantasy">Fantasy</option>
+          <option value="Sci-Fi">Sci-Fi</option>
+          <option value="Romance">Romance</option>
+          <option value="Thriller">Thriller</option>
+          <option value="Mystery">Mystery</option>
+          <option value="Horror">Horror</option>
+          <option value="Literary Fiction">Literary Fiction</option>
+          <option value="Historical Fiction">Historical Fiction</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Synopsis <span class="optional">(optional)</span></label>
+        <textarea id="edit-proj-synopsis-input" placeholder="A brief description of your story…" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Target Word Count <span class="optional">(optional)</span></label>
+        <input type="number" id="edit-proj-target-input" placeholder="e.g. 80000" min="0" step="1000" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="cancel-edit-project-btn">Cancel</button>
+        <button class="btn-primary" id="save-edit-project-btn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP SCREEN -->
+  <div id="app-screen" class="screen hidden">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="back-btn" id="back-to-projects">
+          <span>←</span> Projects
+        </button>
+        <div class="project-title-area">
+          <span class="topbar-logo">✦</span>
+          <h2 id="topbar-project-title">Untitled</h2>
+          <button class="btn-icon btn-edit-proj" id="edit-project-btn" title="Edit project details">✎</button>
+        </div>
+      </div>
+      <div class="topbar-center">
+        <nav class="top-nav">
+          <button class="nav-tab active" data-panel="manuscript">Manuscript</button>
+          <button class="nav-tab" data-panel="codex">Codex</button>
+          <button class="nav-tab" data-panel="plot">Plot</button>
+          <button class="nav-tab" data-panel="notes">Notes</button>
+        </nav>
+      </div>
+      <div class="topbar-right">
+        <div class="word-count-badge" id="total-wc-badge">0 words</div>
+        <button class="btn-ai" id="ai-assistant-btn" title="AI Writing Assistant">✦ AI</button>
+        <button class="btn-icon" id="focus-mode-btn" title="Focus Mode">⛶</button>
+        <button class="btn-icon" id="settings-btn" title="Settings">⚙</button>
+      </div>
+    </header>
+
+    <!-- MANUSCRIPT PANEL -->
+    <div id="panel-manuscript" class="panel active">
+      <aside class="sidebar" id="chapter-sidebar">
+        <div class="sidebar-header">
+          <h3>Chapters</h3>
+          <button class="btn-small" id="add-chapter-btn">+</button>
+        </div>
+        <div id="chapters-list" class="chapters-list"></div>
+        <div class="sidebar-footer">
+          <div class="proj-stats">
+            <div class="stat"><span id="chapter-count">0</span> chapters</div>
+            <div class="stat"><span id="scene-count">0</span> scenes</div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="editor-area" id="editor-area">
+        <!-- Chapter view -->
+        <div id="chapter-overview" class="chapter-overview hidden">
+          <div class="chapter-ov-header">
+            <input type="text" class="chapter-title-input" id="chapter-name-input" placeholder="Chapter Title" />
+            <div class="chapter-ov-actions">
+              <button class="btn-small" id="add-scene-btn">+ Scene</button>
+              <button class="btn-danger-small" id="delete-chapter-btn">🗑</button>
+            </div>
+          </div>
+          <div id="scenes-list" class="scenes-list"></div>
+        </div>
+
+        <!-- Scene editor -->
+        <div id="scene-editor" class="scene-editor hidden">
+          <div class="scene-editor-header">
+            <div class="scene-header-left">
+              <button class="btn-ghost-small" id="back-to-chapter-btn">← Chapter</button>
+              <input type="text" class="scene-title-input" id="scene-name-input" placeholder="Scene title…" />
+            </div>
+            <div class="scene-header-right">
+              <span class="scene-wc" id="scene-wc">0 words</span>
+              <div class="pov-selector">
+                <label>POV</label>
+                <select id="scene-pov-select"><option value="">—</option></select>
+              </div>
+              <button class="btn-danger-small" id="delete-scene-btn">🗑</button>
+            </div>
+          </div>
+          <div class="editor-toolbar">
+            <button class="tool-btn" data-cmd="bold" title="Bold"><b>B</b></button>
+            <button class="tool-btn" data-cmd="italic" title="Italic"><i>I</i></button>
+            <button class="tool-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+            <span class="tool-sep"></span>
+            <button class="tool-btn" data-cmd="insertParagraph" title="Paragraph">¶</button>
+            <span class="tool-sep"></span>
+            <select id="font-size-select" class="tool-select">
+              <option value="14">14px</option>
+              <option value="16" selected>16px</option>
+              <option value="18">18px</option>
+              <option value="20">20px</option>
+              <option value="22">22px</option>
+            </select>
+          </div>
+          <div class="editor-wrap">
+            <div
+              id="scene-content"
+              class="scene-content"
+              contenteditable="true"
+              data-placeholder="Begin your scene…"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div id="editor-empty" class="editor-empty">
+          <div class="empty-icon">✦</div>
+          <p>Select a chapter or scene to begin writing</p>
+          <button class="btn-primary" id="empty-add-chapter-btn">Create First Chapter</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CODEX PANEL -->
+    <div id="panel-codex" class="panel hidden">
+      <aside class="sidebar codex-sidebar">
+        <div class="codex-top-bar">
+          <div class="codex-search-wrap">
+            <span class="codex-search-icon">🔍</span>
+            <input type="text" id="codex-search-input" class="codex-search-input" placeholder="Search entries…" />
+          </div>
+          <div class="codex-new-wrap">
+            <button class="btn-new-entry" id="codex-new-entry-btn">＋ New Entry <span class="new-entry-caret">▾</span></button>
+            <div class="new-entry-dropdown hidden" id="new-entry-dropdown">
+              <div class="new-entry-section-label">Entry Type</div>
+              <button class="new-entry-item" data-cat="Characters">
+                <span class="nei-icon">👤</span><span class="nei-label">Character</span>
+              </button>
+              <button class="new-entry-item" data-cat="Locations">
+                <span class="nei-icon">📍</span><span class="nei-label">Location</span>
+              </button>
+              <button class="new-entry-item" data-cat="Items">
+                <span class="nei-icon">📦</span><span class="nei-label">Object / Item</span>
+              </button>
+              <button class="new-entry-item" data-cat="Factions">
+                <span class="nei-icon">⚑</span><span class="nei-label">Faction</span>
+              </button>
+              <button class="new-entry-item" data-cat="Lore">
+                <span class="nei-icon">📜</span><span class="nei-label">Lore</span>
+              </button>
+              <button class="new-entry-item" data-cat="Subplots">
+                <span class="nei-icon">🔀</span><span class="nei-label">Subplot</span>
+              </button>
+              <button class="new-entry-item" data-cat="Other">
+                <span class="nei-icon">📄</span><span class="nei-label">Other</span>
+              </button>
+              <div class="new-entry-divider"></div>
+              <div class="new-entry-section-label">Quick Create</div>
+              <button class="new-entry-item" data-cat="Style Guide">
+                <span class="nei-icon">🎨</span><span class="nei-label">Style Guide</span>
+              </button>
+              <button class="new-entry-item" data-cat="World Rules">
+                <span class="nei-icon">🌐</span><span class="nei-label">World Rules</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="codex-filter-bar">
+          <button class="codex-filter-btn active" data-cat="All">All</button>
+          <button class="codex-filter-btn" data-cat="Characters">👤</button>
+          <button class="codex-filter-btn" data-cat="Locations">📍</button>
+          <button class="codex-filter-btn" data-cat="Items">📦</button>
+          <button class="codex-filter-btn" data-cat="Factions">⚑</button>
+          <button class="codex-filter-btn" data-cat="Lore">📜</button>
+          <button class="codex-filter-btn" data-cat="Subplots">🔀</button>
+          <button class="codex-filter-btn" data-cat="Other">📄</button>
+        </div>
+        <div id="codex-list" class="codex-list"></div>
+      </aside>
+      <div class="codex-detail" id="codex-detail">
+        <div id="codex-empty" class="editor-empty">
+          <div class="empty-icon">📚</div>
+          <p>Select an entry or create a new one</p>
+        </div>
+        <div id="codex-entry-form" class="codex-entry-form hidden">
+          <div class="codex-form-header">
+            <input type="text" id="codex-entry-name" class="codex-name-input" placeholder="Entry name…" />
+            <div class="codex-form-actions">
+              <span class="codex-cat-badge" id="codex-entry-cat-badge">Character</span>
+              <button class="btn-danger-small" id="delete-codex-btn">🗑</button>
+            </div>
+          </div>
+          <div class="codex-fields">
+            <div class="form-group">
+              <label>Description</label>
+              <div class="codex-rich-editor-wrap">
+                <div class="codex-rich-toolbar">
+                  <button class="codex-tool-btn" data-cmd="bold" title="Bold"><b>B</b></button>
+                  <button class="codex-tool-btn" data-cmd="italic" title="Italic"><i>I</i></button>
+                  <button class="codex-tool-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+                  <span class="codex-tool-sep"></span>
+                  <button class="codex-tool-btn" data-cmd="insertUnorderedList" title="Bullet list">≡</button>
+                  <button class="codex-tool-btn" data-cmd="insertOrderedList" title="Numbered list">№</button>
+                  <span class="codex-tool-sep"></span>
+                  <button class="codex-tool-btn" data-cmd="formatBlock" data-val="h3" title="Heading">H</button>
+                  <button class="codex-tool-btn" data-cmd="formatBlock" data-val="p" title="Paragraph">¶</button>
+                </div>
+                <div
+                  id="codex-entry-desc"
+                  class="codex-rich-content"
+                  contenteditable="true"
+                  data-placeholder="Describe this entry…"
+                ></div>
+              </div>
+            </div>
+            <div class="form-group" id="codex-char-fields">
+              <label>Role / Occupation</label>
+              <input type="text" id="codex-entry-role" placeholder="e.g. Protagonist, Wizard…" />
+            </div>
+            <div class="form-group">
+              <label>Notes</label>
+              <div class="codex-rich-editor-wrap">
+                <div class="codex-rich-toolbar">
+                  <button class="codex-tool-btn" data-cmd="bold" title="Bold"><b>B</b></button>
+                  <button class="codex-tool-btn" data-cmd="italic" title="Italic"><i>I</i></button>
+                  <button class="codex-tool-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+                  <span class="codex-tool-sep"></span>
+                  <button class="codex-tool-btn" data-cmd="insertUnorderedList" title="Bullet list">≡</button>
+                  <button class="codex-tool-btn" data-cmd="insertOrderedList" title="Numbered list">№</button>
+                  <span class="codex-tool-sep"></span>
+                  <button class="codex-tool-btn" data-cmd="formatBlock" data-val="h3" title="Heading">H</button>
+                  <button class="codex-tool-btn" data-cmd="formatBlock" data-val="p" title="Paragraph">¶</button>
+                </div>
+                <div
+                  id="codex-entry-notes"
+                  class="codex-rich-content"
+                  contenteditable="true"
+                  data-placeholder="Additional notes, backstory, connections…"
+                ></div>
+              </div>
+            </div>
+
+            <!-- AI Context section -->
+            <div class="codex-ai-context-section">
+              <div class="codex-ai-context-header">
+                <span class="codex-ai-context-label">AI CONTEXT</span>
+                <span class="codex-ai-context-hint">Controls when this entry is sent to the AI</span>
+              </div>
+              <div class="codex-ai-context-options" id="codex-ai-context-options">
+                <label class="ai-ctx-option">
+                  <input type="radio" name="codex-ai-ctx" value="always" />
+                  <div class="ai-ctx-option-body">
+                    <span class="ai-ctx-option-title">Always include</span>
+                    <span class="ai-ctx-option-desc">Always sent to the AI regardless of the current scene. Good for core characters, world rules, and style guides.</span>
+                  </div>
+                </label>
+                <label class="ai-ctx-option">
+                  <input type="radio" name="codex-ai-ctx" value="auto" checked />
+                  <div class="ai-ctx-option-body">
+                    <span class="ai-ctx-option-title">Auto <span class="ai-ctx-default-badge">Default</span></span>
+                    <span class="ai-ctx-option-desc">Included when the entry's name appears in the current scene or your message.</span>
+                  </div>
+                </label>
+                <label class="ai-ctx-option">
+                  <input type="radio" name="codex-ai-ctx" value="never" />
+                  <div class="ai-ctx-option-body">
+                    <span class="ai-ctx-option-title">Never include</span>
+                    <span class="ai-ctx-option-desc">Never sent to the AI. Useful for entries you want to keep as reference only.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+          <button class="btn-primary" id="save-codex-btn">Save Entry</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLOT PANEL -->
+    <div id="panel-plot" class="panel hidden">
+      <div class="plot-panel-inner">
+        <div class="plot-header">
+          <h3>Story Structure</h3>
+          <div class="plot-structure-selector">
+            <button class="struct-btn active" data-struct="3act">3-Act</button>
+            <button class="struct-btn" data-struct="heros">Hero's Journey</button>
+            <button class="struct-btn" data-struct="save">Save the Cat</button>
+          </div>
+        </div>
+        <div id="plot-board" class="plot-board"></div>
+        <div class="plot-timeline" id="plot-timeline">
+          <h4>Story Beats</h4>
+          <div id="beats-list" class="beats-list"></div>
+          <button class="btn-primary" id="add-beat-btn">+ Add Beat</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOTES PANEL -->
+    <div id="panel-notes" class="panel hidden">
+      <div class="notes-panel-inner">
+        <div class="notes-sidebar">
+          <div class="sidebar-header">
+            <h3>Notes</h3>
+            <button class="btn-small" id="add-note-btn">+</button>
+          </div>
+          <div id="notes-list" class="notes-list"></div>
+        </div>
+        <div class="notes-editor-area">
+          <div id="notes-empty" class="editor-empty">
+            <div class="empty-icon">📝</div>
+            <p>Select a note or create a new one</p>
+          </div>
+          <div id="note-editor" class="note-editor hidden">
+            <input type="text" id="note-title-input" class="note-title-input" placeholder="Note title…" />
+            <textarea id="note-content-input" class="note-content-input" placeholder="Write your note…"></textarea>
+            <div class="note-editor-footer">
+              <span id="note-date"></span>
+              <button class="btn-danger-small" id="delete-note-btn">🗑 Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOCUS MODE OVERLAY -->
+  <div id="focus-overlay" class="focus-overlay hidden">
+    <div class="focus-topbar">
+      <button id="exit-focus-btn">✕ Exit Focus</button>
+      <span id="focus-wc">0 words</span>
+    </div>
+    <div class="focus-editor-wrap">
+      <div
+        id="focus-editor"
+        class="focus-editor"
+        contenteditable="true"
+        data-placeholder="Begin writing…"
+      ></div>
+    </div>
+  </div>
+
+  <!-- DELETE CONFIRM MODAL -->
+  <div id="confirm-modal" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <h3 id="confirm-title">Delete?</h3>
+      <p id="confirm-message">This cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="confirm-cancel">Cancel</button>
+        <button class="btn-danger" id="confirm-ok">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal modal-wide">
+      <h3>Settings</h3>
+
+      <div class="settings-section-title">Editor</div>
+      <div class="form-group">
+        <label>Font Size</label>
+        <input type="range" id="settings-font-size" min="14" max="24" value="16" />
+        <span id="settings-font-label">16px</span>
+      </div>
+      <div class="form-group">
+        <label>Theme</label>
+        <div class="theme-btns">
+          <button class="theme-btn active" data-theme="dark">Dark</button>
+          <button class="theme-btn" data-theme="light">Light</button>
+          <button class="theme-btn" data-theme="sepia">Sepia</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Line Spacing</label>
+        <select id="settings-line-spacing">
+          <option value="1.6">Compact</option>
+          <option value="1.9" selected>Normal</option>
+          <option value="2.4">Relaxed</option>
+        </select>
+      </div>
+
+      <div class="settings-section-title">AI — OpenRouter</div>
+      <div class="form-group">
+        <label>API Key <a href="https://openrouter.ai/keys" target="_blank" class="label-link">Get one free →</a></label>
+        <div class="api-key-row">
+          <input type="password" id="settings-api-key" placeholder="sk-or-v1-…" autocomplete="off" />
+          <button class="btn-ghost" id="settings-key-toggle">Show</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Preceding Context <span id="settings-context-label" style="color:var(--gold);font-family:var(--font-mono);font-size:11px;">2,000 chars</span></label>
+        <input type="range" id="settings-context-chars" min="500" max="8000" step="500" value="2000" />
+        <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-top:4px;">
+          <span>500</span><span>2K</span><span>4K</span><span>6K</span><span>8K</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:6px;font-style:italic;">
+          Text from prior scenes sent before the current scene to help the AI continue naturally.
+        </div>
+      </div>
+      <div class="form-group" id="model-picker-group">
+        <label>Default Model</label>
+        <div class="model-picker-wrap">
+          <input type="text" id="model-search-input" placeholder="Search models…" />
+          <div id="model-list-container" class="model-list-container">
+            <div class="model-list-loading" id="model-list-loading">Enter your API key above to load models</div>
+            <div id="model-list" class="model-list"></div>
+          </div>
+        </div>
+        <div class="selected-model-display" id="selected-model-display">No model selected</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-primary" id="close-settings-btn">Done</button>
+      </div>
+
+      <div class="settings-section-title">Data &amp; Backup</div>
+      <div class="backup-grid">
+        <div class="backup-card">
+          <div class="backup-card-icon">📦</div>
+          <div class="backup-card-info">
+            <div class="backup-card-title">Export All Projects</div>
+            <div class="backup-card-desc">Download every project, scene, codex entry, and note as a single <code>.storyforge</code> JSON file.</div>
+          </div>
+          <button class="btn-primary" id="export-all-btn">Export</button>
+        </div>
+        <div class="backup-card">
+          <div class="backup-card-icon">📂</div>
+          <div class="backup-card-info">
+            <div class="backup-card-title">Import / Restore</div>
+            <div class="backup-card-desc">Load a <code>.storyforge</code> or <code>.json</code> backup file. Existing projects with the same ID will be updated.</div>
+          </div>
+          <button class="btn-ghost" id="import-trigger-btn">Import…</button>
+          <input type="file" id="import-file-input" accept=".storyforge,.json" style="display:none" />
+        </div>
+      </div>
+      <div id="backup-status" class="backup-status hidden"></div>
+
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn-primary" id="close-settings-btn-2">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI ASSISTANT PANEL -->
+  <div id="ai-panel" class="ai-panel hidden">
+    <div class="ai-panel-header">
+      <div class="ai-panel-title">
+        <span class="ai-star">✦</span>
+        <span>AI Assistant</span>
+      </div>
+      <div class="ai-panel-model-row">
+        <span id="ai-current-model-label" class="ai-model-label">No model selected</span>
+        <button class="btn-ghost-small" id="ai-change-model-btn">Change</button>
+      </div>
+      <button class="ai-panel-close" id="ai-panel-close">✕</button>
+    </div>
+
+    <div class="ai-modes">
+      <button class="ai-mode-btn active" data-mode="continue">Continue</button>
+      <button class="ai-mode-btn" data-mode="brainstorm">Brainstorm</button>
+      <button class="ai-mode-btn" data-mode="rewrite">Rewrite</button>
+      <button class="ai-mode-btn" data-mode="chat">Chat</button>
+    </div>
+
+    <div class="ai-context-bar" id="ai-context-bar">
+      <span class="ai-context-icon">§</span>
+      <span id="ai-context-label">No scene selected</span>
+      <button class="ai-preview-btn" id="ai-preview-btn" title="Preview what will be sent to the AI">Preview</button>
+    </div>
+
+    <!-- Context Preview Drawer -->
+    <div id="ai-context-preview" class="ai-context-preview hidden">
+      <div class="ai-preview-header">
+        <span class="ai-preview-title">What will be sent</span>
+        <div class="ai-preview-tabs">
+          <button class="ai-preview-tab active" data-view="structured">Structured</button>
+          <button class="ai-preview-tab" data-view="json">JSON</button>
+          <button class="ai-preview-tab" data-view="xml">XML</button>
+        </div>
+        <button class="ai-preview-close" id="ai-preview-close">✕</button>
+      </div>
+      <div id="ai-preview-sections">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="ai-chat-area" id="ai-chat-area">
+      <div class="ai-welcome" id="ai-welcome">
+        <div class="ai-welcome-icon">✦</div>
+        <p>Select a mode and start a conversation. Your scene context is sent automatically.</p>
+      </div>
+    </div>
+
+    <div class="ai-input-area">
+      <div class="ai-prompt-row">
+        <textarea
+          id="ai-prompt-input"
+          class="ai-prompt-input"
+          placeholder="Ask the AI…"
+          rows="3"
+        ></textarea>
+      </div>
+      <div class="ai-action-row">
+        <div class="ai-quick-btns">
+          <button class="ai-quick-btn" data-prompt="Continue this scene naturally, matching the tone and style.">▶ Auto-continue</button>
+          <button class="ai-quick-btn" data-prompt="Suggest 3 directions this scene could go next.">🔀 Suggest paths</button>
+          <button class="ai-quick-btn" data-prompt="Describe the setting and atmosphere in more sensory detail.">🌅 Expand setting</button>
+        </div>
+        <button class="btn-ai-send" id="ai-send-btn">
+          <span id="ai-send-label">Send</span>
+          <span id="ai-send-spinner" class="ai-spinner hidden"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
