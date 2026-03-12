@@ -2008,6 +2008,7 @@ const AI = {
   conversation: [],     // [{role, content}]
   currentMode: 'continue',
   isStreaming: false,
+  wordTarget: 400,      // target word count for generation
 };
 
 // ── API Key management ──
@@ -2183,6 +2184,57 @@ document.querySelectorAll('.ai-mode-btn').forEach(btn => {
   });
 });
 
+// ── Word Target Buttons ──
+document.querySelectorAll('.ai-wt-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const customInput = document.getElementById('ai-wt-custom-input');
+    if (btn.dataset.words === 'custom') {
+      // Toggle custom input
+      const isOpen = !customInput.classList.contains('hidden');
+      if (isOpen) {
+        customInput.classList.add('hidden');
+        // Restore whichever preset was last active (or default 100)
+        const prev = [...document.querySelectorAll('.ai-wt-btn[data-words]')]
+          .find(b => b.dataset.words !== 'custom' && parseInt(b.dataset.words) === AI.wordTarget);
+        document.querySelectorAll('.ai-wt-btn').forEach(b => b.classList.remove('active'));
+        if (prev) prev.classList.add('active'); else btn.classList.add('active');
+      } else {
+        document.querySelectorAll('.ai-wt-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        customInput.classList.remove('hidden');
+        customInput.value = AI.wordTarget;
+        customInput.focus();
+        customInput.select();
+      }
+      return;
+    }
+    // Preset button
+    document.querySelectorAll('.ai-wt-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    customInput.classList.add('hidden');
+    AI.wordTarget = parseInt(btn.dataset.words);
+  });
+});
+
+document.getElementById('ai-wt-custom-input').addEventListener('input', (e) => {
+  const val = parseInt(e.target.value);
+  if (val >= 50 && val <= 4000) AI.wordTarget = val;
+});
+document.getElementById('ai-wt-custom-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.target.blur();
+    const val = parseInt(e.target.value);
+    if (val >= 50 && val <= 4000) {
+      AI.wordTarget = val;
+      e.target.classList.add('hidden');
+      // Deactivate all preset btns, keep custom btn active
+      document.querySelectorAll('.ai-wt-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.words === 'custom');
+      });
+    }
+  }
+});
+
 const QUICK_BTNS = {
   continue: [
     { label: '▶ Auto-continue', prompt: 'Continue this scene naturally, matching the established tone, voice, and style. Write the next 2–3 paragraphs.' },
@@ -2292,7 +2344,7 @@ async function sendAIMessage() {
           ...historyForAPI,
         ],
         stream: true,
-        max_tokens: 1200,
+        max_tokens: Math.min(4000, Math.max(300, Math.round(AI.wordTarget * 1.4 * 1.25))),
         temperature: 0.85,
       }),
     });
@@ -2468,6 +2520,7 @@ function buildSystemPrompt() {
   if (p.scene)      ctx += `CURRENT SCENE: "${p.scene}"\n\n`;
   if (p.characters) ctx += `CODEX ENTRIES:\n${p.characters}\n\n`;
   ctx += `YOUR ROLE: ${p.mode}\n\n`;
+  ctx += `TARGET LENGTH: Write approximately ${AI.wordTarget} words in your response. Aim for this target — not significantly more or less.\n\n`;
   ctx += `${p.footer}\n\n`;
   ctx += `--- STORY TEXT ---\n`;
   if (p.precedingText) {
@@ -2513,10 +2566,12 @@ function buildApiPayload() {
   const systemPrompt = buildSystemPrompt();
   const userPrompt = document.getElementById('ai-prompt-input').value.trim() || '(your message here)';
   const history = AI.conversation.slice(-10);
+  // ~1.4 tokens per word, add 25% headroom, min 300, max 4000
+  const maxTokens = Math.min(4000, Math.max(300, Math.round(AI.wordTarget * 1.4 * 1.25)));
   return {
     model: modelId,
     stream: true,
-    max_tokens: 1200,
+    max_tokens: maxTokens,
     temperature: 0.85,
     messages: [
       { role: 'system', content: systemPrompt },

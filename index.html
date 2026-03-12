@@ -597,6 +597,18 @@
       <button class="ai-mode-btn" data-mode="chat">Chat</button>
     </div>
 
+    <div class="ai-word-target-row">
+      <span class="ai-word-target-label">Words</span>
+      <div class="ai-word-target-btns">
+        <button class="ai-wt-btn" data-words="100">100</button>
+        <button class="ai-wt-btn" data-words="200">200</button>
+        <button class="ai-wt-btn active" data-words="400">400</button>
+        <button class="ai-wt-btn" data-words="600">600</button>
+        <button class="ai-wt-btn" data-words="custom">✎</button>
+      </div>
+      <input type="number" id="ai-wt-custom-input" class="ai-wt-custom-input hidden" placeholder="e.g. 800" min="50" max="4000" />
+    </div>
+
     <div class="ai-context-bar" id="ai-context-bar">
       <span class="ai-context-icon">§</span>
       <span id="ai-context-label">No scene selected</span>
