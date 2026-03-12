@@ -131,6 +131,26 @@
       </div>
       <div class="topbar-right">
         <div class="word-count-badge" id="total-wc-badge">0 words</div>
+        <div class="export-wrap" id="export-wrap">
+          <button class="btn-icon" id="export-btn" title="Export story">⤓</button>
+          <div class="export-dropdown hidden" id="export-dropdown">
+            <div class="export-dropdown-title">Export Story</div>
+            <button class="export-item" id="export-docx-btn">
+              <span class="export-item-icon">📄</span>
+              <div class="export-item-info">
+                <span class="export-item-label">Word Document</span>
+                <span class="export-item-desc">Chapter titles as H1 headings</span>
+              </div>
+            </button>
+            <button class="export-item" id="export-md-btn">
+              <span class="export-item-icon">⬇</span>
+              <div class="export-item-info">
+                <span class="export-item-label">Markdown</span>
+                <span class="export-item-desc">.md file with # headings</span>
+              </div>
+            </button>
+          </div>
+        </div>
         <button class="btn-ai" id="ai-assistant-btn" title="AI Writing Assistant">✦ AI</button>
         <button class="btn-icon" id="focus-mode-btn" title="Focus Mode">⛶</button>
         <button class="btn-icon" id="settings-btn" title="Settings">⚙</button>
@@ -159,11 +179,24 @@
           <div class="chapter-ov-header">
             <input type="text" class="chapter-title-input" id="chapter-name-input" placeholder="Chapter Title" />
             <div class="chapter-ov-actions">
+              <button class="btn-ghost-small" id="read-chapter-btn" title="Read full chapter">📖 Read</button>
               <button class="btn-small" id="add-scene-btn">+ Scene</button>
               <button class="btn-danger-small" id="delete-chapter-btn">🗑</button>
             </div>
           </div>
           <div id="scenes-list" class="scenes-list"></div>
+        </div>
+
+        <!-- Chapter Read View -->
+        <div id="chapter-read-view" class="chapter-read-view hidden">
+          <div class="chapter-read-header">
+            <button class="btn-ghost-small" id="close-read-view-btn">← Back to Chapter</button>
+            <span class="chapter-read-title" id="chapter-read-title"></span>
+            <span class="chapter-read-wc" id="chapter-read-wc"></span>
+          </div>
+          <div class="chapter-read-scroll" id="chapter-read-scroll">
+            <div class="chapter-read-content" id="chapter-read-content"></div>
+          </div>
         </div>
 
         <!-- Scene editor -->
@@ -424,6 +457,11 @@
   <div id="focus-overlay" class="focus-overlay hidden">
     <div class="focus-topbar">
       <button id="exit-focus-btn">✕ Exit Focus</button>
+      <div class="focus-font-controls">
+        <button id="focus-font-down" title="Decrease font size">A−</button>
+        <span id="focus-font-label">20px</span>
+        <button id="focus-font-up" title="Increase font size">A+</button>
+      </div>
       <span id="focus-wc">0 words</span>
     </div>
     <div class="focus-editor-wrap">

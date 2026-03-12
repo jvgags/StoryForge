@@ -22,6 +22,7 @@ const STATE = {
     lineHeight: 1.9,
     theme: 'dark',
     contextChars: 2000,
+    focusFontSize: 20,
   },
 };
 
@@ -433,14 +434,16 @@ function selectScene(chapterId, sceneId) {
 
 function updateEditorView() {
   const proj = getProject();
-  const editorEmpty = document.getElementById('editor-empty');
+  const editorEmpty    = document.getElementById('editor-empty');
   const chapterOverview = document.getElementById('chapter-overview');
-  const sceneEditor = document.getElementById('scene-editor');
+  const sceneEditor    = document.getElementById('scene-editor');
+  const readView       = document.getElementById('chapter-read-view');
 
   // Hide all
   editorEmpty.classList.add('hidden');
   chapterOverview.classList.add('hidden');
   sceneEditor.classList.add('hidden');
+  readView.classList.add('hidden');
 
   if (!proj || !STATE.currentChapterId) {
     editorEmpty.classList.remove('hidden');
@@ -553,6 +556,81 @@ document.getElementById('add-scene-btn').addEventListener('click', () => {
   save();
   selectScene(ch.id, sc.id);
 });
+
+// Read chapter
+document.getElementById('read-chapter-btn').addEventListener('click', () => {
+  saveCurrentScene();
+  renderChapterReadView(STATE.currentChapterId);
+});
+
+document.getElementById('close-read-view-btn').addEventListener('click', () => {
+  document.getElementById('chapter-read-view').classList.add('hidden');
+  document.getElementById('chapter-overview').classList.remove('hidden');
+});
+
+function renderChapterReadView(chapterId) {
+  const ch = getChapter(chapterId);
+  if (!ch) return;
+
+  const editorEmpty     = document.getElementById('editor-empty');
+  const chapterOverview = document.getElementById('chapter-overview');
+  const sceneEditor     = document.getElementById('scene-editor');
+  const readView        = document.getElementById('chapter-read-view');
+
+  editorEmpty.classList.add('hidden');
+  chapterOverview.classList.add('hidden');
+  sceneEditor.classList.add('hidden');
+  readView.classList.remove('hidden');
+
+  // Header
+  document.getElementById('chapter-read-title').textContent = ch.title || 'Untitled Chapter';
+  const totalWords = ch.scenes.reduce((sum, sc) => sum + countWords(sc.content || ''), 0);
+  document.getElementById('chapter-read-wc').textContent = totalWords.toLocaleString() + ' words';
+
+  // Build content
+  const container = document.getElementById('chapter-read-content');
+  container.innerHTML = '';
+
+  const scenesWithContent = ch.scenes.filter(sc => sc.content && sc.content.trim() !== '<p><br></p>' && sc.content.trim() !== '');
+
+  if (scenesWithContent.length === 0) {
+    container.innerHTML = `<p style="color:var(--text-dim);font-style:italic;text-align:center;padding:40px 0;">This chapter has no content yet.</p>`;
+    return;
+  }
+
+  scenesWithContent.forEach((sc, i) => {
+    const section = document.createElement('div');
+    section.className = 'chapter-read-scene';
+
+    // Scene divider (not before first scene)
+    if (i > 0) {
+      const divider = document.createElement('div');
+      divider.className = 'chapter-read-break';
+      divider.textContent = '* * *';
+      container.appendChild(divider);
+    }
+
+    // Scene label (subtle, only if scene has a real title)
+    const defaultTitle = /^scene\s+\d+$/i.test(sc.title || '');
+    if (sc.title && !defaultTitle) {
+      const label = document.createElement('div');
+      label.className = 'chapter-read-scene-title';
+      label.textContent = sc.title;
+      section.appendChild(label);
+    }
+
+    // Scene prose
+    const body = document.createElement('div');
+    body.className = 'chapter-read-scene-body';
+    body.innerHTML = sc.content || '';
+    section.appendChild(body);
+
+    container.appendChild(section);
+  });
+
+  // Scroll to top
+  document.getElementById('chapter-read-scroll').scrollTop = 0;
+}
 
 // Scene name editing
 document.getElementById('scene-name-input').addEventListener('input', () => {
@@ -1114,12 +1192,31 @@ document.getElementById('delete-note-btn').addEventListener('click', () => {
 const focusOverlay = document.getElementById('focus-overlay');
 const focusEditor = document.getElementById('focus-editor');
 
+function applyFocusFontSize() {
+  const size = STATE.settings.focusFontSize || 20;
+  focusEditor.style.fontSize = size + 'px';
+  document.getElementById('focus-font-label').textContent = size + 'px';
+}
+
+document.getElementById('focus-font-down').addEventListener('click', () => {
+  STATE.settings.focusFontSize = Math.max(12, (STATE.settings.focusFontSize || 20) - 2);
+  applyFocusFontSize();
+  save();
+});
+
+document.getElementById('focus-font-up').addEventListener('click', () => {
+  STATE.settings.focusFontSize = Math.min(48, (STATE.settings.focusFontSize || 20) + 2);
+  applyFocusFontSize();
+  save();
+});
+
 document.getElementById('focus-mode-btn').addEventListener('click', () => {
   if (!STATE.currentSceneId) return;
   const sc = getScene(STATE.currentChapterId, STATE.currentSceneId);
   if (!sc) return;
   focusEditor.innerHTML = sceneContentEl.innerHTML;
   focusOverlay.classList.remove('hidden');
+  applyFocusFontSize();
   focusEditor.focus();
   updateFocusWC();
 });
@@ -1210,6 +1307,501 @@ document.getElementById('confirm-ok').addEventListener('click', () => {
   if (_confirmCallback) _confirmCallback();
   _confirmCallback = null;
 });
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+
+// Dropdown toggle
+document.getElementById('export-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const drop = document.getElementById('export-dropdown');
+  drop.classList.toggle('hidden');
+});
+document.addEventListener('click', () => {
+  document.getElementById('export-dropdown').classList.add('hidden');
+});
+document.getElementById('export-dropdown').addEventListener('click', e => e.stopPropagation());
+
+document.getElementById('export-docx-btn').addEventListener('click', () => {
+  document.getElementById('export-dropdown').classList.add('hidden');
+  exportDocx();
+});
+document.getElementById('export-md-btn').addEventListener('click', () => {
+  document.getElementById('export-dropdown').classList.add('hidden');
+  exportMarkdown();
+});
+
+// ── Pure-JS DOCX builder (no CDN required) ──
+
+function xmlEsc(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+// Parse HTML content into an array of paragraph descriptor objects
+function parseHtmlToParagraphs(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html || '';
+  const paras = [];
+
+  function extractRuns(node, bold = false, italic = false, underline = false) {
+    const runs = [];
+    node.childNodes.forEach(n => {
+      if (n.nodeType === Node.TEXT_NODE) {
+        if (n.textContent) runs.push({ text: n.textContent, bold, italic, underline });
+      } else if (n.nodeType === Node.ELEMENT_NODE) {
+        const t = n.tagName.toLowerCase();
+        if (t === 'br') { runs.push({ text: '', br: true }); return; }
+        const b = bold || t === 'b' || t === 'strong';
+        const i = italic || t === 'i' || t === 'em';
+        const u = underline || t === 'u';
+        runs.push(...extractRuns(n, b, i, u));
+      }
+    });
+    return runs;
+  }
+
+  function processNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const t = node.textContent.trim();
+      if (t) paras.push({ type: 'normal', runs: [{ text: node.textContent }] });
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'h1' || tag === 'h2') {
+      paras.push({ type: 'h2', runs: [{ text: node.textContent, bold: true }] });
+    } else if (tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
+      paras.push({ type: 'h3', runs: [{ text: node.textContent, bold: true }] });
+    } else if (tag === 'ul') {
+      node.querySelectorAll('li').forEach(li => {
+        paras.push({ type: 'bullet', runs: [{ text: li.textContent }] });
+      });
+    } else if (tag === 'ol') {
+      node.querySelectorAll('li').forEach((li, i) => {
+        paras.push({ type: 'number', num: i + 1, runs: [{ text: li.textContent }] });
+      });
+    } else {
+      const runs = extractRuns(node);
+      const text = runs.map(r => r.text).join('').trim();
+      if (text) paras.push({ type: 'normal', runs });
+    }
+  }
+
+  tmp.childNodes.forEach(processNode);
+  return paras;
+}
+
+// Build a <w:p> XML string from a paragraph descriptor
+function buildWPara(para) {
+  const pStyleMap = { h1: 'Heading1', h2: 'Heading2', h3: 'Heading3', normal: 'Normal', bullet: 'Normal', number: 'Normal', center: 'Normal', title: 'Title' };
+  const style = pStyleMap[para.type] || 'Normal';
+
+  let pPr = `<w:pStyle w:val="${style}"/>`;
+  if (para.type === 'center') pPr += `<w:jc w:val="center"/>`;
+  if (para.spacingBefore || para.spacingAfter) {
+    pPr += `<w:spacing${para.spacingBefore ? ` w:before="${para.spacingBefore}"` : ''}${para.spacingAfter ? ` w:after="${para.spacingAfter}"` : ''}/>`;
+  }
+  if (para.type === 'bullet') {
+    pPr += `<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>`;
+  }
+
+  let runsXml = '';
+  if (para.pageBreakBefore) {
+    runsXml += `<w:r><w:rPr><w:b/></w:rPr><w:lastRenderedPageBreak/><w:br w:type="page"/></w:r>`;
+  }
+
+  (para.runs || []).forEach(run => {
+    if (!run.text && !run.br) return;
+    if (run.br) { runsXml += `<w:r><w:br/></w:r>`; return; }
+    let rPr = '';
+    if (run.bold || para.type === 'h1' || para.type === 'h2' || para.type === 'h3' || para.type === 'title') rPr += '<w:b/>';
+    if (run.italic) rPr += '<w:i/>';
+    if (run.underline) rPr += '<w:u w:val="single"/>';
+    if (para.color) rPr += `<w:color w:val="${para.color}"/>`;
+    if (para.fontSize) rPr += `<w:sz w:val="${para.fontSize}"/><w:szCs w:val="${para.fontSize}"/>`;
+    const rPrXml = rPr ? `<w:rPr>${rPr}</w:rPr>` : '';
+    // preserve leading/trailing spaces
+    const text = run.text.replace(/\n/g, '');
+    if (!text) return;
+    const spaceAttr = (text !== text.trim()) ? ' xml:space="preserve"' : '';
+    runsXml += `<w:r>${rPrXml}<w:t${spaceAttr}>${xmlEsc(text)}</w:t></w:r>`;
+  });
+
+  return `<w:p><w:pPr>${pPr}</w:pPr>${runsXml}</w:p>`;
+}
+
+// Build document.xml body from project
+function buildDocumentXml(proj) {
+  const paras = [];
+
+  // Title page
+  paras.push({ type: 'title', spacingBefore: 2880, spacingAfter: 480, runs: [{ text: proj.title, bold: true }] });
+  if (proj.genre) paras.push({ type: 'center', color: '888888', fontSize: 20, spacingAfter: 240, runs: [{ text: proj.genre.toUpperCase() }] });
+  if (proj.synopsis) paras.push({ type: 'center', color: '555555', spacingAfter: 480, runs: [{ text: proj.synopsis, italic: true }] });
+
+  (proj.chapters || []).forEach((ch, chIdx) => {
+    // Page break + H1 chapter title
+    paras.push({ type: 'h1', pageBreakBefore: true, spacingBefore: 480, spacingAfter: 360, runs: [{ text: ch.title || `Chapter ${chIdx + 1}`, bold: true }] });
+
+    (ch.scenes || []).forEach((sc, scIdx) => {
+      // Scene title as H2 if it has a real name
+      const isDefaultTitle = /^scene\s+\d+$/i.test(sc.title || '');
+      if (sc.title && !isDefaultTitle) {
+        paras.push({ type: 'h2', spacingBefore: 360, spacingAfter: 180, runs: [{ text: sc.title, bold: true }] });
+      }
+
+      // Scene content
+      const sceneParas = parseHtmlToParagraphs(sc.content || '');
+      paras.push(...sceneParas);
+
+      // Scene break
+      if (scIdx < (ch.scenes || []).length - 1) {
+        paras.push({ type: 'center', color: 'AAAAAA', spacingBefore: 360, spacingAfter: 360, runs: [{ text: '* * *' }] });
+      }
+    });
+  });
+
+  const body = paras.map(buildWPara).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+  xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+  xmlns:v="urn:schemas-microsoft-com:vml"
+  xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+  xmlns:w10="urn:schemas-microsoft-com:office:word"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+  xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"
+  xmlns:w16cex="http://schemas.microsoft.com/office/word/2018/wordml/cex"
+  xmlns:w16cid="http://schemas.microsoft.com/office/word/2016/wordml/cid"
+  xmlns:w16="http://schemas.microsoft.com/office/word/2018/wordml"
+  xmlns:w16sdtdh="http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash"
+  xmlns:w16se="http://schemas.microsoft.com/office/word/2015/wordml/symex"
+  xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+  xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+  xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml"
+  xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+  mc:Ignorable="w14 w15 w16se w16cid w16 w16cex w16sdtdh wp14">
+  <w:body>
+${body}
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+}
+
+function buildStylesXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:docDefaults>
+    <w:rPrDefault><w:rPr>
+      <w:rFonts w:ascii="Georgia" w:hAnsi="Georgia"/>
+      <w:sz w:val="24"/><w:szCs w:val="24"/>
+    </w:rPr></w:rPrDefault>
+    <w:pPrDefault><w:pPr>
+      <w:spacing w:after="160" w:line="360" w:lineRule="auto"/>
+    </w:pPr></w:pPrDefault>
+  </w:docDefaults>
+  <w:style w:type="paragraph" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+    <w:pPr><w:spacing w:after="160" w:line="360" w:lineRule="auto"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Georgia" w:hAnsi="Georgia"/><w:sz w:val="24"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Title">
+    <w:name w:val="Title"/>
+    <w:basedOn w:val="Normal"/>
+    <w:pPr><w:jc w:val="center"/><w:spacing w:before="2880" w:after="480"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="56"/><w:szCs w:val="56"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Heading1">
+    <w:name w:val="Heading 1"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:pPr><w:outlineLvl w:val="0"/><w:spacing w:before="480" w:after="240"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="36"/><w:szCs w:val="36"/><w:color w:val="1a1a1a"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Heading2">
+    <w:name w:val="Heading 2"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:pPr><w:outlineLvl w:val="1"/><w:spacing w:before="360" w:after="180"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="28"/><w:szCs w:val="28"/><w:color w:val="333333"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Heading3">
+    <w:name w:val="Heading 3"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:pPr><w:outlineLvl w:val="2"/><w:spacing w:before="240" w:after="120"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="24"/><w:szCs w:val="24"/><w:color w:val="555555"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="ListParagraph">
+    <w:name w:val="List Paragraph"/>
+    <w:basedOn w:val="Normal"/>
+    <w:pPr><w:ind w:left="720"/></w:pPr>
+  </w:style>
+</w:styles>`;
+}
+
+function buildNumberingXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="0">
+    <w:lvl w:ilvl="0">
+      <w:start w:val="1"/>
+      <w:numFmt w:val="bullet"/>
+      <w:lvlText w:val="•"/>
+      <w:lvlJc w:val="left"/>
+      <w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr>
+    </w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1">
+    <w:abstractNumId w:val="0"/>
+  </w:num>
+</w:numbering>`;
+}
+
+// Tiny ZIP builder — no external deps
+// Produces a valid ZIP/docx binary using Uint8Array + CRC32
+function buildDocxZip(files) {
+  // files: [{name, data (string or Uint8Array)}]
+  function strToBytes(str) {
+    return new TextEncoder().encode(str);
+  }
+  function crc32(buf) {
+    const table = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      table[i] = c;
+    }
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < buf.length; i++) crc = table[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+  function u16le(n) { return [(n & 0xFF), ((n >> 8) & 0xFF)]; }
+  function u32le(n) { return [(n & 0xFF), ((n >> 8) & 0xFF), ((n >> 16) & 0xFF), ((n >> 24) & 0xFF)]; }
+
+  const entries = files.map(f => {
+    const data = typeof f.data === 'string' ? strToBytes(f.data) : f.data;
+    const name = strToBytes(f.name);
+    const crc  = crc32(data);
+    return { name, data, crc, size: data.length };
+  });
+
+  const parts = [];
+  const centralDir = [];
+  let offset = 0;
+
+  entries.forEach(e => {
+    const localHeader = new Uint8Array([
+      0x50,0x4B,0x03,0x04,       // sig
+      20,0,                       // version needed
+      0,0,                        // flags
+      0,0,                        // compression = stored
+      0,0,0,0,                    // mod time/date
+      ...u32le(e.crc),
+      ...u32le(e.size),
+      ...u32le(e.size),
+      ...u16le(e.name.length),
+      0,0,                        // extra len
+    ]);
+    parts.push(localHeader, e.name, e.data);
+
+    centralDir.push({ offset, e });
+    offset += localHeader.length + e.name.length + e.size;
+  });
+
+  const cdParts = [];
+  let cdSize = 0;
+  centralDir.forEach(({ offset: off, e }) => {
+    const cd = new Uint8Array([
+      0x50,0x4B,0x01,0x02,        // sig
+      20,0,                        // version made
+      20,0,                        // version needed
+      0,0,                         // flags
+      0,0,                         // compression
+      0,0,0,0,                     // mod time/date
+      ...u32le(e.crc),
+      ...u32le(e.size),
+      ...u32le(e.size),
+      ...u16le(e.name.length),
+      0,0,                         // extra len
+      0,0,                         // comment len
+      0,0,                         // disk start
+      0,0,                         // internal attr
+      0,0,0,0,                     // external attr
+      ...u32le(off),
+    ]);
+    cdParts.push(cd, e.name);
+    cdSize += cd.length + e.name.length;
+  });
+
+  const eocd = new Uint8Array([
+    0x50,0x4B,0x05,0x06,           // sig
+    0,0,0,0,                        // disk numbers
+    ...u16le(entries.length),
+    ...u16le(entries.length),
+    ...u32le(cdSize),
+    ...u32le(offset),
+    0,0,                            // comment length
+  ]);
+
+  const allParts = [...parts, ...cdParts, eocd];
+  const total = allParts.reduce((s, p) => s + p.length, 0);
+  const out = new Uint8Array(total);
+  let pos = 0;
+  allParts.forEach(p => { out.set(p, pos); pos += p.length; });
+  return out;
+}
+
+// ── DOCX Export ──
+
+function exportDocx() {
+  const proj = getProject();
+  if (!proj) return;
+
+  const documentXml = buildDocumentXml(proj);
+  const stylesXml   = buildStylesXml();
+  const numberingXml = buildNumberingXml();
+
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+  <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
+  <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
+</Types>`;
+
+  const relsRoot = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+  const relsWord = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
+</Relationships>`;
+
+  const settingsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:defaultTabStop w:val="720"/>
+</w:settings>`;
+
+  const files = [
+    { name: '[Content_Types].xml',       data: contentTypes },
+    { name: '_rels/.rels',               data: relsRoot },
+    { name: 'word/_rels/document.xml.rels', data: relsWord },
+    { name: 'word/document.xml',         data: documentXml },
+    { name: 'word/styles.xml',           data: stylesXml },
+    { name: 'word/numbering.xml',        data: numberingXml },
+    { name: 'word/settings.xml',         data: settingsXml },
+  ];
+
+  const zipBytes = buildDocxZip(files);
+  const blob = new Blob([zipBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  const slug = proj.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'story';
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${slug}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// ── Markdown Export ──
+
+function htmlToMarkdown(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html || '';
+  let md = '';
+
+  const walkNode = (node, context = {}) => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    const tag = node.tagName.toLowerCase();
+    const inner = Array.from(node.childNodes).map(n => walkNode(n, context)).join('');
+    switch (tag) {
+      case 'b': case 'strong': return `**${inner}**`;
+      case 'i': case 'em':    return `*${inner}*`;
+      case 'u':               return `__${inner}__`;
+      case 'h1': case 'h2':  return `\n## ${inner}\n`;
+      case 'h3': case 'h4':  return `\n### ${inner}\n`;
+      case 'br':              return '\n';
+      case 'p':               return `\n${inner}\n`;
+      case 'ul':              return '\n' + Array.from(node.querySelectorAll('li')).map(li => `- ${li.textContent}`).join('\n') + '\n';
+      case 'ol':              return '\n' + Array.from(node.querySelectorAll('li')).map((li, i) => `${i+1}. ${li.textContent}`).join('\n') + '\n';
+      case 'li':              return '';  // handled by ul/ol
+      default:                return inner;
+    }
+  };
+
+  tmp.childNodes.forEach(node => { md += walkNode(node); });
+  return md.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function exportMarkdown() {
+  const proj = getProject();
+  if (!proj) return;
+
+  let md = '';
+
+  // Title block
+  md += `# ${proj.title}\n\n`;
+  if (proj.genre) md += `*${proj.genre}*\n\n`;
+  if (proj.synopsis) md += `> ${proj.synopsis}\n\n`;
+  md += `---\n\n`;
+
+  (proj.chapters || []).forEach((ch, chIdx) => {
+    // Chapter as H1
+    md += `# ${ch.title || `Chapter ${chIdx + 1}`}\n\n`;
+
+    (ch.scenes || []).forEach((sc, scIdx) => {
+      const isDefaultTitle = /^scene\s+\d+$/i.test(sc.title || '');
+      if (sc.title && !isDefaultTitle) {
+        md += `## ${sc.title}\n\n`;
+      }
+
+      const content = htmlToMarkdown(sc.content || '');
+      if (content) md += content + '\n\n';
+
+      // Scene break between scenes
+      if (scIdx < ch.scenes.length - 1) {
+        md += `---\n\n`;
+      }
+    });
+
+    md += '\n';
+  });
+
+  const slug = proj.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${slug}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
 
 // ─── BACKUP & RESTORE ─────────────────────────────────────────────────────────
 
