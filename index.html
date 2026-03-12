@@ -236,11 +236,18 @@
             <button class="tool-btn" data-cmd="insertParagraph" title="Paragraph">¶</button>
             <span class="tool-sep"></span>
             <select id="font-size-select" class="tool-select">
+              <option value="12">12px</option>
               <option value="14">14px</option>
-              <option value="16" selected>16px</option>
+              <option value="16">16px</option>
               <option value="18">18px</option>
               <option value="20">20px</option>
               <option value="22">22px</option>
+              <option value="24">24px</option>
+              <option value="28">28px</option>
+              <option value="32">32px</option>
+              <option value="36">36px</option>
+              <option value="40">40px</option>
+              <option value="48">48px</option>
             </select>
           </div>
           <div class="editor-wrap">
@@ -507,7 +514,7 @@
       <div class="settings-section-title">Editor</div>
       <div class="form-group">
         <label>Font Size</label>
-        <input type="range" id="settings-font-size" min="14" max="24" value="16" />
+        <input type="range" id="settings-font-size" min="12" max="48" step="2" value="16" />
         <span id="settings-font-label">16px</span>
       </div>
       <div class="form-group">

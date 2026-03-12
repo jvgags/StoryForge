@@ -1197,7 +1197,7 @@ html, body {
 }
 
 .scene-content {
-  max-width: 680px;
+  max-width: 950px;
   margin: 0 auto;
   min-height: 400px;
   font-family: var(--font-prose);
@@ -2031,11 +2031,11 @@ html, body {
 
 .focus-editor {
   width: 100%;
-  max-width: 660px;
+  max-width: 950px;
   min-height: 100%;
   font-family: var(--font-prose);
-  font-size: 20px;
-  line-height: 2;
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
   color: var(--text-primary);
   outline: none;
   caret-color: var(--gold);

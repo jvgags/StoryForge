@@ -22,7 +22,6 @@ const STATE = {
     lineHeight: 1.9,
     theme: 'dark',
     contextChars: 2000,
-    focusFontSize: 20,
   },
 };
 
@@ -807,7 +806,13 @@ document.querySelectorAll('.tool-btn').forEach(btn => {
 });
 
 document.getElementById('font-size-select').addEventListener('change', (e) => {
-  sceneContentEl.style.fontSize = e.target.value + 'px';
+  STATE.settings.fontSize = parseInt(e.target.value);
+  applyEditorSettings();
+  applyFocusFontSize();
+  // sync settings modal slider
+  const slider = document.getElementById('settings-font-size');
+  if (slider) { slider.value = STATE.settings.fontSize; document.getElementById('settings-font-label').textContent = STATE.settings.fontSize + 'px'; }
+  save();
 });
 
 function updateTotalWC() {
@@ -1296,20 +1301,26 @@ const focusOverlay = document.getElementById('focus-overlay');
 const focusEditor = document.getElementById('focus-editor');
 
 function applyFocusFontSize() {
-  const size = STATE.settings.focusFontSize || 20;
-  focusEditor.style.fontSize = size + 'px';
+  const size = STATE.settings.fontSize || 16;
   document.getElementById('focus-font-label').textContent = size + 'px';
 }
 
 document.getElementById('focus-font-down').addEventListener('click', () => {
-  STATE.settings.focusFontSize = Math.max(12, (STATE.settings.focusFontSize || 20) - 2);
+  STATE.settings.fontSize = Math.max(12, (STATE.settings.fontSize || 16) - 2);
+  applyEditorSettings();
   applyFocusFontSize();
+  // Keep settings modal slider in sync if open
+  const slider = document.getElementById('settings-font-size');
+  if (slider) { slider.value = STATE.settings.fontSize; document.getElementById('settings-font-label').textContent = STATE.settings.fontSize + 'px'; }
   save();
 });
 
 document.getElementById('focus-font-up').addEventListener('click', () => {
-  STATE.settings.focusFontSize = Math.min(48, (STATE.settings.focusFontSize || 20) + 2);
+  STATE.settings.fontSize = Math.min(48, (STATE.settings.fontSize || 16) + 2);
+  applyEditorSettings();
   applyFocusFontSize();
+  const slider = document.getElementById('settings-font-size');
+  if (slider) { slider.value = STATE.settings.fontSize; document.getElementById('settings-font-label').textContent = STATE.settings.fontSize + 'px'; }
   save();
 });
 
@@ -1355,11 +1366,14 @@ document.getElementById('settings-font-size').addEventListener('input', (e) => {
   STATE.settings.fontSize = parseInt(e.target.value);
   document.getElementById('settings-font-label').textContent = e.target.value + 'px';
   applyEditorSettings();
+  applyFocusFontSize();
+  save();
 });
 
 document.getElementById('settings-line-spacing').addEventListener('change', (e) => {
   STATE.settings.lineHeight = parseFloat(e.target.value);
   applyEditorSettings();
+  save();
 });
 
 document.getElementById('settings-context-chars').addEventListener('input', (e) => {
@@ -1381,8 +1395,36 @@ function applyEditorSettings() {
   const s = STATE.settings;
   document.documentElement.style.setProperty('--editor-font-size', s.fontSize + 'px');
   document.documentElement.style.setProperty('--editor-line-height', s.lineHeight);
-  focusEditor.style.fontSize = s.fontSize + 'px';
-  focusEditor.style.lineHeight = s.lineHeight;
+  // Keep toolbar dropdown in sync
+  const sel = document.getElementById('font-size-select');
+  if (sel) {
+    // Try to select exact match; if none exists add a temporary option
+    let matched = false;
+    for (let i = 0; i < sel.options.length; i++) {
+      if (parseInt(sel.options[i].value) === s.fontSize) {
+        sel.selectedIndex = i;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      // Insert a one-off option for this value so the dropdown shows correctly
+      const opt = document.createElement('option');
+      opt.value = s.fontSize;
+      opt.textContent = s.fontSize + 'px';
+      // Insert in sorted order
+      let inserted = false;
+      for (let i = 0; i < sel.options.length; i++) {
+        if (parseInt(sel.options[i].value) > s.fontSize) {
+          sel.insertBefore(opt, sel.options[i]);
+          inserted = true;
+          break;
+        }
+      }
+      if (!inserted) sel.appendChild(opt);
+      sel.value = s.fontSize;
+    }
+  }
 }
 
 function applyTheme() {
