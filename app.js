@@ -126,21 +126,30 @@ function renderProjects() {
     const pct = target > 0 ? Math.min(100, Math.round(wc / target * 100)) : 0;
     const card = document.createElement('div');
     card.className = 'project-card';
+
+    // Cover / placeholder
+    const coverHtml = proj.coverImage
+      ? `<img class="project-card-cover" src="${proj.coverImage}" alt="Cover" />`
+      : `<div class="project-card-cover-placeholder">✦</div>`;
+
     card.innerHTML = `
-      <div class="project-card-genre">${esc(proj.genre || 'Fiction')}</div>
-      <h3>${esc(proj.title)}</h3>
-      ${proj.synopsis ? `<div class="project-card-synopsis">${esc(proj.synopsis)}</div>` : ''}
-      ${target > 0 ? `
-        <div class="proj-progress-wrap">
-          <div class="proj-progress-bar-bg"><div class="proj-progress-bar-fill" style="width:${pct}%"></div></div>
-          <div class="proj-progress-label">${wc.toLocaleString()} / ${target.toLocaleString()} words (${pct}%)</div>
-        </div>` : ''}
-      <div class="project-card-footer">
-        <div class="project-card-stats">${wc.toLocaleString()} words · ${proj.chapters.length} chapters</div>
-        <div style="display:flex;gap:6px;">
-          <button class="project-card-backup" data-id="${proj.id}" title="Export this project">💾</button>
-          <button class="project-card-edit" data-id="${proj.id}" title="Edit project">✎</button>
-          <button class="project-card-delete" data-id="${proj.id}" title="Delete project">🗑</button>
+      ${coverHtml}
+      <div class="project-card-body">
+        <div class="project-card-genre">${esc(proj.genre || 'Fiction')}</div>
+        <h3>${esc(proj.title)}</h3>
+        ${proj.synopsis ? `<div class="project-card-synopsis">${esc(proj.synopsis)}</div>` : ''}
+        ${target > 0 ? `
+          <div class="proj-progress-wrap">
+            <div class="proj-progress-bar-bg"><div class="proj-progress-bar-fill" style="width:${pct}%"></div></div>
+            <div class="proj-progress-label">${wc.toLocaleString()} / ${target.toLocaleString()} words (${pct}%)</div>
+          </div>` : ''}
+        <div class="project-card-footer">
+          <div class="project-card-stats">${wc.toLocaleString()} words · ${proj.chapters.length} chapters</div>
+          <div style="display:flex;gap:6px;">
+            <button class="project-card-backup" data-id="${proj.id}" title="Export this project">💾</button>
+            <button class="project-card-edit" data-id="${proj.id}" title="Edit project">✎</button>
+            <button class="project-card-delete" data-id="${proj.id}" title="Delete project">🗑</button>
+          </div>
         </div>
       </div>
     `;
@@ -275,9 +284,97 @@ function openEditProjectModal(projId) {
   for (let i = 0; i < sel.options.length; i++) {
     if (sel.options[i].value === proj.genre) { sel.selectedIndex = i; break; }
   }
+  // Cover image
+  const zone = document.getElementById('cover-upload-zone');
+  const preview = document.getElementById('cover-preview');
+  const prompt = document.getElementById('cover-upload-prompt');
+  const removeBtn = document.getElementById('cover-remove-btn');
+  if (proj.coverImage) {
+    preview.src = proj.coverImage;
+    preview.classList.remove('hidden');
+    prompt.classList.add('hidden');
+    removeBtn.classList.remove('hidden');
+    zone.classList.add('has-cover');
+  } else {
+    preview.src = '';
+    preview.classList.add('hidden');
+    prompt.classList.remove('hidden');
+    removeBtn.classList.add('hidden');
+    zone.classList.remove('has-cover');
+  }
+  document.getElementById('cover-file-input').value = '';
   document.getElementById('edit-project-modal').classList.remove('hidden');
   document.getElementById('edit-proj-title-input').focus();
 }
+
+// Cover upload interactions
+document.getElementById('cover-upload-zone').addEventListener('click', (e) => {
+  if (e.target.id === 'cover-remove-btn') return;
+  document.getElementById('cover-file-input').click();
+});
+
+document.getElementById('cover-file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const dataUrl = ev.target.result;
+    const preview = document.getElementById('cover-preview');
+    const prompt = document.getElementById('cover-upload-prompt');
+    const removeBtn = document.getElementById('cover-remove-btn');
+    const zone = document.getElementById('cover-upload-zone');
+    preview.src = dataUrl;
+    preview.classList.remove('hidden');
+    prompt.classList.add('hidden');
+    removeBtn.classList.remove('hidden');
+    zone.classList.add('has-cover');
+    // Store temporarily so saveEditProject can read it
+    zone.dataset.pendingCover = dataUrl;
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('cover-remove-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const preview = document.getElementById('cover-preview');
+  const prompt = document.getElementById('cover-upload-prompt');
+  const zone = document.getElementById('cover-upload-zone');
+  preview.src = '';
+  preview.classList.add('hidden');
+  prompt.classList.remove('hidden');
+  document.getElementById('cover-remove-btn').classList.add('hidden');
+  zone.classList.remove('has-cover');
+  zone.dataset.pendingCover = '';
+  document.getElementById('cover-file-input').value = '';
+});
+
+// Drag-and-drop support on the cover zone
+document.getElementById('cover-upload-zone').addEventListener('dragover', (e) => {
+  e.preventDefault();
+  document.getElementById('cover-upload-zone').style.borderColor = 'var(--gold)';
+});
+document.getElementById('cover-upload-zone').addEventListener('dragleave', () => {
+  document.getElementById('cover-upload-zone').style.borderColor = '';
+});
+document.getElementById('cover-upload-zone').addEventListener('drop', (e) => {
+  e.preventDefault();
+  document.getElementById('cover-upload-zone').style.borderColor = '';
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const dataUrl = ev.target.result;
+    const preview = document.getElementById('cover-preview');
+    const zone = document.getElementById('cover-upload-zone');
+    preview.src = dataUrl;
+    preview.classList.remove('hidden');
+    document.getElementById('cover-upload-prompt').classList.add('hidden');
+    document.getElementById('cover-remove-btn').classList.remove('hidden');
+    zone.classList.add('has-cover');
+    zone.dataset.pendingCover = dataUrl;
+  };
+  reader.readAsDataURL(file);
+});
 
 document.getElementById('edit-project-btn').addEventListener('click', () => {
   openEditProjectModal(STATE.currentProjectId);
@@ -302,6 +399,12 @@ function saveEditProject() {
   proj.synopsis = document.getElementById('edit-proj-synopsis-input').value.trim();
   const targetVal = parseInt(document.getElementById('edit-proj-target-input').value);
   proj.targetWordCount = isNaN(targetVal) || targetVal <= 0 ? 0 : targetVal;
+  // Save cover image
+  const zone = document.getElementById('cover-upload-zone');
+  if (zone.dataset.pendingCover !== undefined) {
+    proj.coverImage = zone.dataset.pendingCover || null;
+    delete zone.dataset.pendingCover;
+  }
   save();
   document.getElementById('edit-project-modal').classList.add('hidden');
   // Update topbar title if editing the open project

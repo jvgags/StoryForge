@@ -74,6 +74,19 @@
     <div class="modal">
       <h3>Edit Project</h3>
       <div class="form-group">
+        <label>Cover Image</label>
+        <div class="cover-upload-zone" id="cover-upload-zone">
+          <img id="cover-preview" class="cover-preview hidden" alt="Cover" />
+          <div class="cover-upload-prompt" id="cover-upload-prompt">
+            <span class="cover-upload-icon">🖼</span>
+            <span>Click to upload cover</span>
+            <span class="cover-upload-hint">JPG, PNG or WEBP</span>
+          </div>
+          <button class="cover-remove-btn hidden" id="cover-remove-btn" title="Remove cover">✕</button>
+        </div>
+        <input type="file" id="cover-file-input" accept="image/jpeg,image/png,image/webp" style="display:none" />
+      </div>
+      <div class="form-group">
         <label>Title</label>
         <input type="text" id="edit-proj-title-input" placeholder="Project title…" />
       </div>
