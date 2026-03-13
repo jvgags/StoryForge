@@ -220,6 +220,7 @@ function openProject(id, restore = false) {
       renderPlotPanel();
     }
   }
+  loadAISettings();
 }
 
 // ─── NEW PROJECT MODAL ────────────────────────────────────────────────────────
@@ -2208,6 +2209,7 @@ const AI = {
   currentMode: 'continue',
   isStreaming: false,
   wordTarget: 400,      // target word count for generation
+  temperature: 1.0,     // generation temperature
 };
 
 // ── API Key management ──
@@ -2412,12 +2414,13 @@ document.querySelectorAll('.ai-wt-btn').forEach(btn => {
     btn.classList.add('active');
     customInput.classList.add('hidden');
     AI.wordTarget = parseInt(btn.dataset.words);
+    saveAISettings();
   });
 });
 
 document.getElementById('ai-wt-custom-input').addEventListener('input', (e) => {
   const val = parseInt(e.target.value);
-  if (val >= 50 && val <= 4000) AI.wordTarget = val;
+  if (val >= 50 && val <= 4000) { AI.wordTarget = val; saveAISettings(); }
 });
 document.getElementById('ai-wt-custom-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
@@ -2430,13 +2433,70 @@ document.getElementById('ai-wt-custom-input').addEventListener('keydown', (e) =>
       document.querySelectorAll('.ai-wt-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.words === 'custom');
       });
+      saveAISettings();
     }
   }
 });
 
+// ── Temperature slider ──
+function tempHint(t) {
+  if (t <= 0.3) return 'Precise';
+  if (t <= 0.7) return 'Focused';
+  if (t <= 1.1) return 'Balanced';
+  if (t <= 1.5) return 'Creative';
+  return 'Wild';
+}
+
+document.getElementById('ai-temp-slider').addEventListener('input', (e) => {
+  AI.temperature = parseFloat(e.target.value);
+  document.getElementById('ai-temp-label').textContent = AI.temperature.toFixed(1);
+  document.getElementById('ai-temp-hint').textContent = tempHint(AI.temperature);
+  saveAISettings();
+});
+
+// Persist AI word target + temperature on the current project
+function saveAISettings() {
+  const proj = getProject();
+  if (!proj) return;
+  proj.aiWordTarget  = AI.wordTarget;
+  proj.aiTemperature = AI.temperature;
+  save();
+}
+
+// Load AI settings from project when switching projects
+function loadAISettings() {
+  const proj = getProject();
+  const wordTarget  = proj?.aiWordTarget  ?? 400;
+  const temperature = proj?.aiTemperature ?? 1.0;
+
+  AI.wordTarget  = wordTarget;
+  AI.temperature = temperature;
+
+  // Sync word target buttons
+  const btns = document.querySelectorAll('.ai-wt-btn');
+  const customInput = document.getElementById('ai-wt-custom-input');
+  const preset = [...btns].find(b => b.dataset.words !== 'custom' && parseInt(b.dataset.words) === wordTarget);
+  btns.forEach(b => b.classList.remove('active'));
+  customInput.classList.add('hidden');
+  if (preset) {
+    preset.classList.add('active');
+  } else {
+    // Custom value — show it in the custom input
+    document.querySelector('.ai-wt-btn[data-words="custom"]').classList.add('active');
+    customInput.classList.remove('hidden');
+    customInput.value = wordTarget;
+  }
+
+  // Sync temperature slider
+  const slider = document.getElementById('ai-temp-slider');
+  slider.value = temperature;
+  document.getElementById('ai-temp-label').textContent = temperature.toFixed(1);
+  document.getElementById('ai-temp-hint').textContent = tempHint(temperature);
+}
+
 const QUICK_BTNS = {
   continue: [
-    { label: '▶ Auto-continue', prompt: 'Continue this scene naturally, matching the established tone, voice, and style. Write the next 2–3 paragraphs.' },
+    { label: '▶ Auto-continue', prompt: 'Continue this scene naturally, matching the established tone, voice, and style.' },
     { label: '🔀 Suggest paths', prompt: 'Suggest 3 different directions this scene could go next, each with a brief description.' },
     { label: '🌅 Expand setting', prompt: 'Expand the current setting with more vivid sensory detail — sight, sound, smell, touch.' },
   ],
@@ -2543,8 +2603,8 @@ async function sendAIMessage() {
           ...historyForAPI,
         ],
         stream: true,
-        max_tokens: Math.min(4000, Math.max(300, Math.round(AI.wordTarget * 1.4 * 1.25))),
-        temperature: 0.85,
+        max_tokens: Math.min(8000, Math.max(400, Math.round(AI.wordTarget * 1.8 * 1.3))),
+        temperature: AI.temperature,
       }),
     });
 
@@ -2580,15 +2640,17 @@ async function sendAIMessage() {
     }
 
     bubble.classList.remove('ai-streaming');
-    // Add insert-to-scene button for writing modes
+    // Render final response as formatted HTML
+    bubble.innerHTML = markdownToHtml(fullResponse);
     if (['continue', 'rewrite'].includes(AI.currentMode)) {
       const actionsEl = assistantEl.querySelector('.ai-msg-actions');
       actionsEl.innerHTML = `
         <button class="ai-msg-action" title="Insert at cursor in scene">✦ Insert into scene</button>
         <button class="ai-msg-action" title="Copy to clipboard">📋 Copy</button>`;
       actionsEl.querySelector('[title="Insert at cursor in scene"]').addEventListener('click', () => insertTextIntoScene(fullResponse));
-      actionsEl.querySelector('[title="Copy to clipboard"]').addEventListener('click', () => {
-        navigator.clipboard.writeText(fullResponse);
+      actionsEl.querySelector('[title="Copy to clipboard"]').addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        copyToClipboard(fullResponse, btn);
       });
     }
 
@@ -2719,7 +2781,7 @@ function buildSystemPrompt() {
   if (p.scene)      ctx += `CURRENT SCENE: "${p.scene}"\n\n`;
   if (p.characters) ctx += `CODEX ENTRIES:\n${p.characters}\n\n`;
   ctx += `YOUR ROLE: ${p.mode}\n\n`;
-  ctx += `TARGET LENGTH: Write approximately ${AI.wordTarget} words in your response. Aim for this target — not significantly more or less.\n\n`;
+  ctx += `TARGET LENGTH: You MUST write exactly ${AI.wordTarget} words — count carefully. Do not stop early. Do not summarize or truncate. Keep writing until you reach ${AI.wordTarget} words.\n\n`;
   ctx += `${p.footer}\n\n`;
   ctx += `--- STORY TEXT ---\n`;
   if (p.precedingText) {
@@ -2765,13 +2827,13 @@ function buildApiPayload() {
   const systemPrompt = buildSystemPrompt();
   const userPrompt = document.getElementById('ai-prompt-input').value.trim() || '(your message here)';
   const history = AI.conversation.slice(-10);
-  // ~1.4 tokens per word, add 25% headroom, min 300, max 4000
-  const maxTokens = Math.min(4000, Math.max(300, Math.round(AI.wordTarget * 1.4 * 1.25)));
+  // ~1.8 tokens per word for prose, 30% headroom, min 400, max 8000
+  const maxTokens = Math.min(8000, Math.max(400, Math.round(AI.wordTarget * 1.8 * 1.3)));
   return {
     model: modelId,
     stream: true,
     max_tokens: maxTokens,
-    temperature: 0.85,
+    temperature: AI.temperature,
     messages: [
       { role: 'system', content: systemPrompt },
       ...history,
@@ -2916,12 +2978,8 @@ function renderRawPreview(container, fmt) {
     </div>
     <div class="ai-preview-raw-code" id="ai-raw-code">${highlighted}</div>
   `;
-  wrap.querySelector('#copy-raw-btn').addEventListener('click', () => {
-    navigator.clipboard.writeText(rawText).then(() => {
-      const btn = wrap.querySelector('#copy-raw-btn');
-      btn.textContent = '✓ Copied!';
-      setTimeout(() => btn.textContent = '📋 Copy', 1500);
-    });
+  wrap.querySelector('#copy-raw-btn').addEventListener('click', (e) => {
+    copyToClipboard(rawText, e.currentTarget);
   });
   container.appendChild(wrap);
 }
@@ -2933,11 +2991,85 @@ document.getElementById('ai-prompt-input').addEventListener('input', () => {
   }
 });
 
+function markdownToHtml(md) {
+  // Process block by block
+  const lines = md.split('\n');
+  const blocks = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Headings
+    if (/^### (.+)/.test(line))      { blocks.push(`<h3>${inlineMarkdown(line.replace(/^### /, ''))}</h3>`); i++; continue; }
+    if (/^## (.+)/.test(line))       { blocks.push(`<h3>${inlineMarkdown(line.replace(/^## /, ''))}</h3>`); i++; continue; }
+    if (/^# (.+)/.test(line))        { blocks.push(`<h3>${inlineMarkdown(line.replace(/^# /, ''))}</h3>`); i++; continue; }
+
+    // Horizontal rule
+    if (/^(\*\*\*|---|___)\s*$/.test(line)) { blocks.push('<hr>'); i++; continue; }
+
+    // Unordered list — collect consecutive items
+    if (/^[-*+] /.test(line)) {
+      const items = [];
+      while (i < lines.length && /^[-*+] /.test(lines[i])) {
+        items.push(`<li>${inlineMarkdown(lines[i].replace(/^[-*+] /, ''))}</li>`);
+        i++;
+      }
+      blocks.push(`<ul>${items.join('')}</ul>`);
+      continue;
+    }
+
+    // Ordered list
+    if (/^\d+\. /.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\d+\. /.test(lines[i])) {
+        items.push(`<li>${inlineMarkdown(lines[i].replace(/^\d+\. /, ''))}</li>`);
+        i++;
+      }
+      blocks.push(`<ol>${items.join('')}</ol>`);
+      continue;
+    }
+
+    // Blank line — skip (paragraph breaks handled by grouping)
+    if (line.trim() === '') { i++; continue; }
+
+    // Regular paragraph — collect consecutive non-blank, non-special lines
+    const paraLines = [];
+    while (i < lines.length && lines[i].trim() !== '' &&
+           !/^#{1,3} /.test(lines[i]) && !/^[-*+] /.test(lines[i]) &&
+           !/^\d+\. /.test(lines[i]) && !/^(\*\*\*|---|___)\s*$/.test(lines[i])) {
+      paraLines.push(lines[i]);
+      i++;
+    }
+    if (paraLines.length) blocks.push(`<p>${inlineMarkdown(paraLines.join(' '))}</p>`);
+  }
+
+  return blocks.join('');
+}
+
+function inlineMarkdown(text) {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    // Bold+italic
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.+?)__/g, '<strong>$1</strong>')
+    // Italic
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/_(.+?)_/g, '<em>$1</em>')
+    // Inline code
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    // Em dash shorthand
+    .replace(/--/g, '—');
+}
+
 function insertTextIntoScene(text) {
   if (!STATE.currentSceneId) { showAIError('Open a scene first to insert text.'); return; }
   const el = document.getElementById('scene-content');
   el.focus();
-  // Insert at end if nothing selected
+
+  // Place cursor at end if not already inside the editor
   const sel = window.getSelection();
   if (!sel.rangeCount || !el.contains(sel.anchorNode)) {
     const range = document.createRange();
@@ -2946,13 +3078,12 @@ function insertTextIntoScene(text) {
     sel.removeAllRanges();
     sel.addRange(range);
   }
-  // Insert as paragraph
-  const paragraphs = text.trim().split(/\n\n+/);
-  paragraphs.forEach(para => {
-    if (para.trim()) document.execCommand('insertHTML', false, `<p>${para.trim()}</p>`);
-  });
+
+  // Convert markdown → HTML then insert
+  const html = markdownToHtml(text.trim());
+  document.execCommand('insertHTML', false, html);
+
   saveCurrentScene();
-  // Update wc
   document.getElementById('scene-wc').textContent = countWords(el.innerHTML) + ' words';
   updateTotalWC();
 }
@@ -2968,6 +3099,32 @@ function appendAIMessage(role, text, streaming = false) {
   chat.appendChild(div);
   scrollAIToBottom();
   return div;
+}
+
+function copyToClipboard(text, btn) {
+  const done = () => {
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    }
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try { document.execCommand('copy'); done?.(); } catch {}
+  document.body.removeChild(ta);
 }
 
 function showAIError(msg) {
