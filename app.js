@@ -1412,6 +1412,11 @@ document.addEventListener('keydown', (e) => {
 
 // ─── SETTINGS ─────────────────────────────────────────────────────────────────
 
+document.getElementById('close-settings-x').addEventListener('click', () => {
+  document.getElementById('settings-modal').classList.add('hidden');
+  save();
+});
+
 document.getElementById('close-settings-btn').addEventListener('click', () => {
   document.getElementById('settings-modal').classList.add('hidden');
   save();
@@ -2667,9 +2672,15 @@ async function sendAIMessage() {
 // ── Preceding text helpers ──
 
 function htmlToText(html) {
+  if (!html) return '';
+  // Insert a space before block-level tags so words don't run together
+  const spaced = html
+    .replace(/<\/(p|div|li|h[1-6]|blockquote|br)>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, ' ');
   const d = document.createElement('div');
-  d.innerHTML = html;
-  return d.textContent || '';
+  d.innerHTML = spaced;
+  // Collapse multiple spaces/newlines to single space
+  return (d.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
 /**
