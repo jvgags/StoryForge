@@ -1401,10 +1401,28 @@ html, body {
   border-radius: var(--radius-sm);
   gap: 8px;
   transition: background var(--transition);
+  position: relative;
 }
 .codex-list-item:hover { background: var(--bg-hover); }
 .codex-list-item.active { background: var(--gold-glow); }
 .codex-list-item.active .codex-item-name { color: var(--gold); }
+.codex-list-item.drag-over { background: var(--bg-hover); outline: 1px dashed var(--gold-dim); }
+.codex-list-item.dragging { opacity: 0.4; }
+
+.codex-drag-handle {
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: grab;
+  padding: 0 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--transition);
+  line-height: 1;
+  letter-spacing: -1px;
+  user-select: none;
+}
+.codex-drag-handle:active { cursor: grabbing; }
+.codex-list-item:hover .codex-drag-handle { opacity: 1; }
 
 .codex-item-icon { font-size: 13px; flex-shrink: 0; width: 18px; text-align: center; }
 .codex-item-name { font-size: 13px; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

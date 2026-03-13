@@ -1010,24 +1010,78 @@ function renderCodexList() {
     return;
   }
 
+  // Drag-and-drop only makes sense when viewing the full unfiltered list
+  const canDrag = filter === 'All' && !query;
+  let dragSrcId = null;
+
   entries.forEach(entry => {
     const icon = CODEX_ICONS[entry.category] || '📄';
     const isAll = filter === 'All';
     const isAlways = entry.aiContext === 'always';
     const el = document.createElement('div');
     el.className = 'codex-list-item' + (entry.id === STATE.currentCodexId ? ' active' : '');
+    el.dataset.id = entry.id;
+
     el.innerHTML = `
+      ${canDrag ? `<span class="codex-drag-handle" title="Drag to reorder">⠿</span>` : ''}
       <span class="codex-item-icon">${icon}</span>
       <span class="codex-item-name">${esc(entry.name)}</span>
       ${isAlways ? `<span class="codex-item-always-badge" title="Always included in AI context">✦</span>` : ''}
       ${isAll && !isAlways ? `<span class="codex-item-cat-tag">${esc(CODEX_SINGULAR[entry.category] || entry.category)}</span>` : ''}
     `;
+
     el.addEventListener('click', () => {
       STATE.currentCodexId = entry.id;
       renderCodexList();
       loadCodexEntry(entry.id);
       save();
     });
+
+    if (canDrag) {
+      el.draggable = true;
+
+      el.addEventListener('dragstart', (e) => {
+        dragSrcId = entry.id;
+        el.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', entry.id);
+      });
+
+      el.addEventListener('dragend', () => {
+        el.classList.remove('dragging');
+        list.querySelectorAll('.codex-list-item').forEach(n => n.classList.remove('drag-over'));
+      });
+
+      el.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragSrcId !== entry.id) {
+          list.querySelectorAll('.codex-list-item').forEach(n => n.classList.remove('drag-over'));
+          el.classList.add('drag-over');
+        }
+      });
+
+      el.addEventListener('dragleave', () => {
+        el.classList.remove('drag-over');
+      });
+
+      el.addEventListener('drop', (e) => {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        if (!dragSrcId || dragSrcId === entry.id) return;
+
+        // Reorder proj.codex array
+        const codex = proj.codex;
+        const fromIdx = codex.findIndex(c => c.id === dragSrcId);
+        const toIdx   = codex.findIndex(c => c.id === entry.id);
+        if (fromIdx === -1 || toIdx === -1) return;
+        const [moved] = codex.splice(fromIdx, 1);
+        codex.splice(toIdx, 0, moved);
+        save();
+        renderCodexList();
+      });
+    }
+
     list.appendChild(el);
   });
 }
@@ -2792,11 +2846,10 @@ function renderStructuredPreview(container) {
     { label: 'System Role',        content: parts.role,                   always: true },
     { label: 'Project',            content: parts.project,                always: false },
     { label: 'Chapter / Scene',    content: [parts.chapter ? `Chapter: ${parts.chapter}` : null, parts.scene ? `Scene: ${parts.scene}` : null].filter(Boolean).join('\n') || null, always: false },
-    { label: 'Characters',         content: parts.characters,             always: false },
+    { label: `Codex Entries${parts.characters ? ` (${parts.alwaysCount || 0} always · ${parts.autoCount || 0} detected)` : ''}`, content: parts.characters, always: false },
     { label: 'AI Mode / Role',     content: parts.mode,                   always: true },
     { label: `Preceding Text (last ${(parts.contextChars||2000).toLocaleString()} chars)`, content: parts.precedingText, always: false },
     { label: 'Current Scene',      content: parts.currentSceneText,       always: false },
-    { label: `Codex Entries${parts.characters ? ` (${parts.alwaysCount || 0} always · ${parts.autoCount || 0} detected)` : ''}`, content: parts.characters, always: false },
     { label: 'Your Message',       content: userPrompt || '(nothing typed yet)', always: true, highlight: true },
   ];
 
