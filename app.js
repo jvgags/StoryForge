@@ -432,6 +432,10 @@ document.getElementById('edit-project-btn').addEventListener('click', () => {
   openEditProjectModal(STATE.currentProjectId);
 });
 
+document.getElementById('close-edit-project-x').addEventListener('click', () => {
+  document.getElementById('edit-project-modal').classList.add('hidden');
+});
+
 document.getElementById('cancel-edit-project-btn').addEventListener('click', () => {
   document.getElementById('edit-project-modal').classList.add('hidden');
 });
