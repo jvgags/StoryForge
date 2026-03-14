@@ -75,10 +75,10 @@
   --bg-raised:   #f7f0dc;
   --bg-hover:    #ede4c8;
 
-  --gold:        #b8860b;
-  --gold-bright: #d4a017;
-  --gold-dim:    #c4a44a;
-  --gold-glow:   rgba(184, 134, 11, 0.15);
+  --gold:        #c8920a;
+  --gold-bright: #e0a820;
+  --gold-dim:    #d4b86a;
+  --gold-glow:   rgba(200, 146, 10, 0.15);
 
   --text-primary:   #2c1f08;
   --text-secondary: #5c4020;
@@ -756,6 +756,112 @@ html, body {
   border-radius: 20px;
   padding: 3px 10px;
 }
+.word-count-badge.hidden { display: none; }
+
+/* Short story range fields in modals */
+.ss-range-fields { }
+.ss-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ss-range-inputs input {
+  flex: 1;
+  background: var(--bg-mid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 7px 10px;
+  min-width: 0;
+}
+.ss-range-inputs input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+.ss-range-sep {
+  color: var(--text-dim);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* Short story progress bar in topbar */
+#topbar-wc-area { display: flex; align-items: center; }
+
+.ss-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ss-progress.hidden { display: none; }
+
+.ss-progress-bar-wrap { width: 100px; }
+.ss-progress-bar-bg {
+  height: 5px;
+  background: var(--bg-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ss-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--text-dim);
+  transition: width 0.3s ease, background 0.3s ease;
+}
+.ss-progress-fill.ss-good { background: #4caf82; }
+.ss-progress-fill.ss-warn { background: #e0a020; }
+.ss-progress-fill.ss-over { background: #c04040; }
+
+.ss-progress-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* Short story badge on project cards */
+.ss-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  background: var(--gold-glow);
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+  border-radius: 20px;
+  padding: 1px 6px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+/* Story type picker in new/edit project modals */
+.story-type-picker {
+  display: flex;
+  gap: 10px;
+}
+.story-type-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-mid);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+  color: var(--text-secondary);
+}
+.story-type-btn:hover { border-color: var(--gold-dim); background: var(--bg-hover); }
+.story-type-btn.active {
+  border-color: var(--gold);
+  background: var(--gold-glow);
+  color: var(--text-primary);
+}
+.story-type-icon { font-size: 20px; }
+.story-type-label { font-size: 13px; font-weight: 600; }
+.story-type-sub { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); }
 
 /* ══════════════════════════════════════
    APP LAYOUT

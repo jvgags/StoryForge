@@ -41,6 +41,29 @@
     <div class="modal">
       <h3>New Project</h3>
       <div class="form-group">
+        <label>Story Type</label>
+        <div class="story-type-picker" id="new-story-type-picker">
+          <button class="story-type-btn active" data-type="novel">
+            <span class="story-type-icon">📖</span>
+            <span class="story-type-label">Novel</span>
+            <span class="story-type-sub">No word limit</span>
+          </button>
+          <button class="story-type-btn" data-type="short_story">
+            <span class="story-type-icon">📄</span>
+            <span class="story-type-label">Short Story</span>
+            <span class="story-type-sub">Custom word range</span>
+          </button>
+        </div>
+      </div>
+      <div class="form-group ss-range-fields hidden" id="new-ss-range">
+        <label>Word Count Range</label>
+        <div class="ss-range-inputs">
+          <input type="number" id="new-ss-min" placeholder="Min" min="100" max="10000" step="100" value="1000" />
+          <span class="ss-range-sep">–</span>
+          <input type="number" id="new-ss-max" placeholder="Max" min="100" max="10000" step="100" value="2500" />
+        </div>
+      </div>
+      <div class="form-group">
         <label>Title</label>
         <input type="text" id="proj-title-input" placeholder="The Name of the Wind…" />
       </div>
@@ -85,6 +108,29 @@
           <button class="cover-remove-btn hidden" id="cover-remove-btn" title="Remove cover">✕</button>
         </div>
         <input type="file" id="cover-file-input" accept="image/jpeg,image/png,image/webp" style="display:none" />
+      </div>
+      <div class="form-group">
+        <label>Story Type</label>
+        <div class="story-type-picker" id="edit-story-type-picker">
+          <button class="story-type-btn active" data-type="novel">
+            <span class="story-type-icon">📖</span>
+            <span class="story-type-label">Novel</span>
+            <span class="story-type-sub">No word limit</span>
+          </button>
+          <button class="story-type-btn" data-type="short_story">
+            <span class="story-type-icon">📄</span>
+            <span class="story-type-label">Short Story</span>
+            <span class="story-type-sub" id="edit-ss-sub">Custom word range</span>
+          </button>
+        </div>
+      </div>
+      <div class="form-group ss-range-fields hidden" id="edit-ss-range">
+        <label>Word Count Range <span class="optional">(min – max)</span></label>
+        <div class="ss-range-inputs">
+          <input type="number" id="edit-ss-min" placeholder="Min e.g. 1000" min="100" max="10000" step="100" value="1000" />
+          <span class="ss-range-sep">–</span>
+          <input type="number" id="edit-ss-max" placeholder="Max e.g. 2500" min="100" max="10000" step="100" value="2500" />
+        </div>
       </div>
       <div class="form-group">
         <label>Title</label>
@@ -143,7 +189,17 @@
         </nav>
       </div>
       <div class="topbar-right">
-        <div class="word-count-badge" id="total-wc-badge">0 words</div>
+        <div id="topbar-wc-area">
+          <div class="word-count-badge" id="total-wc-badge">0 words</div>
+          <div class="ss-progress hidden" id="ss-progress">
+            <div class="ss-progress-bar-wrap">
+              <div class="ss-progress-bar-bg">
+                <div class="ss-progress-fill" id="ss-progress-fill"></div>
+              </div>
+            </div>
+            <div class="ss-progress-label" id="ss-progress-label">0 / 2,500</div>
+          </div>
+        </div>
         <div class="export-wrap" id="export-wrap">
           <button class="btn-icon" id="export-btn" title="Export story">⤓</button>
           <div class="export-dropdown hidden" id="export-dropdown">
@@ -310,6 +366,12 @@
               <button class="new-entry-item" data-cat="World Rules">
                 <span class="nei-icon">🌐</span><span class="nei-label">World Rules</span>
               </button>
+              <button class="new-entry-item" data-cat="Instructions">
+                <span class="nei-icon">📋</span><span class="nei-label">Instructions</span>
+              </button>
+              <button class="new-entry-item" data-cat="Synopsis">
+                <span class="nei-icon">📝</span><span class="nei-label">Synopsis</span>
+              </button>
             </div>
           </div>
         </div>
@@ -322,6 +384,8 @@
           <button class="codex-filter-btn" data-cat="Lore">📜</button>
           <button class="codex-filter-btn" data-cat="Subplots">🔀</button>
           <button class="codex-filter-btn" data-cat="Other">📄</button>
+          <button class="codex-filter-btn" data-cat="Instructions">📋</button>
+          <button class="codex-filter-btn" data-cat="Synopsis">📝</button>
         </div>
         <div id="codex-list" class="codex-list"></div>
       </aside>

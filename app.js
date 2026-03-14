@@ -134,7 +134,7 @@ function renderProjects() {
     card.innerHTML = `
       ${coverHtml}
       <div class="project-card-body">
-        <div class="project-card-genre">${esc(proj.genre || 'Fiction')}</div>
+        <div class="project-card-genre">${esc(proj.genre || 'Fiction')}${proj.storyType === 'short_story' ? ' <span class="ss-badge">Short Story</span>' : ''}</div>
         <h3>${esc(proj.title)}</h3>
         ${proj.synopsis ? `<div class="project-card-synopsis">${esc(proj.synopsis)}</div>` : ''}
         ${target > 0 ? `
@@ -235,6 +235,37 @@ document.getElementById('cancel-project-btn').addEventListener('click', () => {
   clearProjectForm();
 });
 
+document.querySelectorAll('#new-story-type-picker .story-type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#new-story-type-picker .story-type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('new-ss-range').classList.toggle('hidden', btn.dataset.type !== 'short_story');
+  });
+});
+
+document.querySelectorAll('#edit-story-type-picker .story-type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#edit-story-type-picker .story-type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const isShort = btn.dataset.type === 'short_story';
+    document.getElementById('edit-ss-range').classList.toggle('hidden', !isShort);
+    if (isShort) {
+      setTimeout(() => document.getElementById('edit-ss-min').focus(), 50);
+      updateEditSsSub();
+    }
+  });
+});
+
+function updateEditSsSub() {
+  const min = document.getElementById('edit-ss-min')?.value || 1000;
+  const max = document.getElementById('edit-ss-max')?.value || 2500;
+  const sub = document.getElementById('edit-ss-sub');
+  if (sub) sub.textContent = `${parseInt(min).toLocaleString()} – ${parseInt(max).toLocaleString()} words`;
+}
+
+document.getElementById('edit-ss-min')?.addEventListener('input', updateEditSsSub);
+document.getElementById('edit-ss-max')?.addEventListener('input', updateEditSsSub);
+
 document.getElementById('create-project-btn').addEventListener('click', createProject);
 document.getElementById('proj-title-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') createProject();
@@ -245,11 +276,17 @@ function createProject() {
   if (!title) { document.getElementById('proj-title-input').focus(); return; }
   const genre = document.getElementById('proj-genre-input').value;
   const synopsis = document.getElementById('proj-synopsis-input').value.trim();
+  const storyType = document.querySelector('#new-story-type-picker .story-type-btn.active')?.dataset.type || 'novel';
+  const ssMin = storyType === 'short_story' ? (parseInt(document.getElementById('new-ss-min').value) || 1000) : null;
+  const ssMax = storyType === 'short_story' ? (parseInt(document.getElementById('new-ss-max').value) || 2500) : null;
   const proj = {
     id: genId(),
     title,
     genre,
     synopsis,
+    storyType,
+    ssMin,
+    ssMax,
     chapters: [],
     codex: [],
     notes: [],
@@ -268,6 +305,11 @@ function clearProjectForm() {
   document.getElementById('proj-title-input').value = '';
   document.getElementById('proj-synopsis-input').value = '';
   document.getElementById('proj-genre-input').selectedIndex = 0;
+  document.querySelectorAll('#new-story-type-picker .story-type-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('#new-story-type-picker .story-type-btn[data-type="novel"]').classList.add('active');
+  document.getElementById('new-ss-range').classList.add('hidden');
+  document.getElementById('new-ss-min').value = 1000;
+  document.getElementById('new-ss-max').value = 2500;
 }
 
 // ─── EDIT PROJECT ─────────────────────────────────────────────────────────────
@@ -279,6 +321,16 @@ function openEditProjectModal(projId) {
   document.getElementById('edit-proj-title-input').value = proj.title || '';
   document.getElementById('edit-proj-synopsis-input').value = proj.synopsis || '';
   document.getElementById('edit-proj-target-input').value = proj.targetWordCount || '';
+  // Story type picker
+  const st = proj.storyType || 'novel';
+  document.querySelectorAll('#edit-story-type-picker .story-type-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === st);
+  });
+  const editSsRange = document.getElementById('edit-ss-range');
+  editSsRange.classList.toggle('hidden', st !== 'short_story');
+  document.getElementById('edit-ss-min').value = proj.ssMin ?? 1000;
+  document.getElementById('edit-ss-max').value = proj.ssMax ?? 2500;
+  if (st === 'short_story') updateEditSsSub();
   // Set genre select
   const sel = document.getElementById('edit-proj-genre-input');
   for (let i = 0; i < sel.options.length; i++) {
@@ -397,6 +449,14 @@ function saveEditProject() {
   proj.title = title;
   proj.genre = document.getElementById('edit-proj-genre-input').value;
   proj.synopsis = document.getElementById('edit-proj-synopsis-input').value.trim();
+  proj.storyType = document.querySelector('#edit-story-type-picker .story-type-btn.active')?.dataset.type || 'novel';
+  if (proj.storyType === 'short_story') {
+    proj.ssMin = parseInt(document.getElementById('edit-ss-min').value) || 1000;
+    proj.ssMax = parseInt(document.getElementById('edit-ss-max').value) || 2500;
+  } else {
+    proj.ssMin = null;
+    proj.ssMax = null;
+  }
   const targetVal = parseInt(document.getElementById('edit-proj-target-input').value);
   proj.targetWordCount = isNaN(targetVal) || targetVal <= 0 ? 0 : targetVal;
   // Save cover image
@@ -819,7 +879,30 @@ document.getElementById('font-size-select').addEventListener('change', (e) => {
 function updateTotalWC() {
   const proj = getProject();
   const wc = proj ? projectWordCount(proj) : 0;
-  document.getElementById('total-wc-badge').textContent = wc.toLocaleString() + ' words';
+  const isShortStory = proj?.storyType === 'short_story';
+
+  const badge = document.getElementById('total-wc-badge');
+  const ssProgress = document.getElementById('ss-progress');
+
+  if (isShortStory) {
+    const ssMin = proj.ssMin ?? 1000;
+    const ssMax = proj.ssMax ?? 2500;
+    const warnAt = ssMin + Math.round((ssMax - ssMin) * 0.88);
+    badge.classList.add('hidden');
+    ssProgress.classList.remove('hidden');
+    const pct = Math.min(100, Math.round(wc / ssMax * 100));
+    const fill = document.getElementById('ss-progress-fill');
+    fill.style.width = pct + '%';
+    fill.className = 'ss-progress-fill';
+    if (wc > ssMax) fill.classList.add('ss-over');
+    else if (wc >= ssMin) fill.classList.add(wc > warnAt ? 'ss-warn' : 'ss-good');
+    document.getElementById('ss-progress-label').textContent =
+      `${wc.toLocaleString()} / ${ssMax.toLocaleString()}${wc > ssMax ? ' ⚠ Over' : wc >= ssMin ? ' ✓' : ''}`;
+  } else {
+    badge.classList.remove('hidden');
+    ssProgress.classList.add('hidden');
+    badge.textContent = wc.toLocaleString() + ' words';
+  }
 }
 
 // ─── CODEX PANEL ─────────────────────────────────────────────────────────────
@@ -903,8 +986,10 @@ const CODEX_ICONS = {
   Lore:        '📜',
   Subplots:    '🔀',
   Other:       '📄',
-  'Style Guide': '🎨',
-  'World Rules': '🌐',
+  'Style Guide':  '🎨',
+  'World Rules':  '🌐',
+  'Instructions': '📋',
+  'Synopsis':     '📝',
 };
 
 // Singular labels for badge display
@@ -912,6 +997,7 @@ const CODEX_SINGULAR = {
   Characters: 'Character', Locations: 'Location', Items: 'Item',
   Factions: 'Faction', Lore: 'Lore', Subplots: 'Subplot',
   Other: 'Other', 'Style Guide': 'Style Guide', 'World Rules': 'World Rules',
+  'Instructions': 'Instructions', 'Synopsis': 'Synopsis',
 };
 
 // ── New Entry dropdown ──
@@ -2471,23 +2557,70 @@ function saveAISettings() {
 // Load AI settings from project when switching projects
 function loadAISettings() {
   const proj = getProject();
-  const wordTarget  = proj?.aiWordTarget  ?? 400;
+  const isShortStory = proj?.storyType === 'short_story';
+
+  // Default word target differs by type
+  const defaultTarget = isShortStory ? 150 : 400;
+  const wordTarget  = proj?.aiWordTarget  ?? defaultTarget;
   const temperature = proj?.aiTemperature ?? 1.0;
 
   AI.wordTarget  = wordTarget;
   AI.temperature = temperature;
 
-  // Sync word target buttons
-  const btns = document.querySelectorAll('.ai-wt-btn');
+  // Swap preset buttons for short story mode
+  const btnsWrap = document.querySelector('.ai-word-target-btns');
+  btnsWrap.innerHTML = isShortStory
+    ? `<button class="ai-wt-btn" data-words="50">50</button>
+       <button class="ai-wt-btn" data-words="100">100</button>
+       <button class="ai-wt-btn active" data-words="150">150</button>
+       <button class="ai-wt-btn" data-words="200">200</button>
+       <button class="ai-wt-btn" data-words="custom">✎</button>`
+    : `<button class="ai-wt-btn" data-words="100">100</button>
+       <button class="ai-wt-btn" data-words="200">200</button>
+       <button class="ai-wt-btn active" data-words="400">400</button>
+       <button class="ai-wt-btn" data-words="600">600</button>
+       <button class="ai-wt-btn" data-words="custom">✎</button>`;
+
+  // Re-attach click handlers to new buttons
+  btnsWrap.querySelectorAll('.ai-wt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const customInput = document.getElementById('ai-wt-custom-input');
+      if (btn.dataset.words === 'custom') {
+        const isOpen = !customInput.classList.contains('hidden');
+        if (isOpen) {
+          customInput.classList.add('hidden');
+          const prev = [...btnsWrap.querySelectorAll('.ai-wt-btn[data-words]')]
+            .find(b => b.dataset.words !== 'custom' && parseInt(b.dataset.words) === AI.wordTarget);
+          btnsWrap.querySelectorAll('.ai-wt-btn').forEach(b => b.classList.remove('active'));
+          if (prev) prev.classList.add('active'); else btn.classList.add('active');
+        } else {
+          btnsWrap.querySelectorAll('.ai-wt-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          customInput.classList.remove('hidden');
+          customInput.value = AI.wordTarget;
+          customInput.focus();
+          customInput.select();
+        }
+        return;
+      }
+      btnsWrap.querySelectorAll('.ai-wt-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('ai-wt-custom-input').classList.add('hidden');
+      AI.wordTarget = parseInt(btn.dataset.words);
+      saveAISettings();
+    });
+  });
+
+  // Sync active button to saved word target
   const customInput = document.getElementById('ai-wt-custom-input');
-  const preset = [...btns].find(b => b.dataset.words !== 'custom' && parseInt(b.dataset.words) === wordTarget);
-  btns.forEach(b => b.classList.remove('active'));
+  const preset = [...btnsWrap.querySelectorAll('.ai-wt-btn')]
+    .find(b => b.dataset.words !== 'custom' && parseInt(b.dataset.words) === wordTarget);
+  btnsWrap.querySelectorAll('.ai-wt-btn').forEach(b => b.classList.remove('active'));
   customInput.classList.add('hidden');
   if (preset) {
     preset.classList.add('active');
   } else {
-    // Custom value — show it in the custom input
-    document.querySelector('.ai-wt-btn[data-words="custom"]').classList.add('active');
+    btnsWrap.querySelector('.ai-wt-btn[data-words="custom"]').classList.add('active');
     customInput.classList.remove('hidden');
     customInput.value = wordTarget;
   }
@@ -2557,6 +2690,22 @@ async function sendAIMessage() {
   const inp = document.getElementById('ai-prompt-input');
   const userText = inp.value.trim();
   if (!userText || AI.isStreaming) return;
+
+  // Short story hard cap — block generation if at or over limit
+  const proj = getProject();
+  if (proj?.storyType === 'short_story') {
+    const ssMax = proj.ssMax ?? 2500;
+    const wc = projectWordCount(proj);
+    if (wc >= ssMax) {
+      showAIError(`This short story has reached the ${ssMax.toLocaleString()}-word limit (${wc.toLocaleString()} words). Edit or trim existing content to continue.`);
+      return;
+    }
+    // Clamp word target to remaining budget
+    const remaining = ssMax - wc;
+    if (AI.wordTarget > remaining) {
+      AI.wordTarget = Math.max(50, remaining);
+    }
+  }
 
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -2786,10 +2935,32 @@ function buildContextParts() {
 
 function buildSystemPrompt() {
   const p = buildContextParts();
+  const proj = getProject();
+  const isShortStory = proj?.storyType === 'short_story';
+
   let ctx = p.role + '\n\n';
   if (p.project)    ctx += `PROJECT:\n${p.project}\n\n`;
   if (p.chapter)    ctx += `CURRENT CHAPTER: "${p.chapter}"\n`;
   if (p.scene)      ctx += `CURRENT SCENE: "${p.scene}"\n\n`;
+
+  // Short story budget awareness
+  if (isShortStory) {
+    const ssMin = proj.ssMin ?? 1000;
+    const ssMax = proj.ssMax ?? 2500;
+    const wc = projectWordCount(proj);
+    const remaining = Math.max(0, ssMax - wc);
+    ctx += `SHORT STORY CONSTRAINTS:\n`;
+    ctx += `• Target range: ${ssMin.toLocaleString()}–${ssMax.toLocaleString()} words total\n`;
+    ctx += `• Words written so far: ${wc.toLocaleString()}\n`;
+    ctx += `• Remaining budget: ${remaining.toLocaleString()} words\n`;
+    if (remaining < 300) {
+      ctx += `• ⚠ BUDGET ALMOST EXHAUSTED — write a satisfying conclusion within the remaining budget. Do NOT exceed it.\n`;
+    } else {
+      ctx += `• Write content that fits naturally within this budget. Pace accordingly.\n`;
+    }
+    ctx += '\n';
+  }
+
   if (p.characters) ctx += `CODEX ENTRIES:\n${p.characters}\n\n`;
   ctx += `YOUR ROLE: ${p.mode}\n\n`;
   ctx += `TARGET LENGTH: You MUST write exactly ${AI.wordTarget} words — count carefully. Do not stop early. Do not summarize or truncate. Keep writing until you reach ${AI.wordTarget} words.\n\n`;
@@ -3061,17 +3232,18 @@ function markdownToHtml(md) {
 function inlineMarkdown(text) {
   return text
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    // Bold+italic
-    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-    // Bold
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/__(.+?)__/g, '<strong>$1</strong>')
-    // Italic
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/_(.+?)_/g, '<em>$1</em>')
+    // Bold+italic (must come before bold and italic)
+    .replace(/\*\*\*([^*\n]+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    // Bold — require non-space at edges, no newlines inside
+    .replace(/\*\*([^\s*][^*\n]*?[^\s*])\*\*/g, '<strong>$1</strong>')
+    .replace(/\*\*([^\s*])\*\*/g, '<strong>$1</strong>')
+    .replace(/__([^\s_][^_\n]*?[^\s_])__/g, '<strong>$1</strong>')
+    // Italic — require non-space at edges, no newlines inside
+    .replace(/\*([^\s*][^*\n]*?[^\s*])\*/g, '<em>$1</em>')
+    .replace(/\*([^\s*])\*/g, '<em>$1</em>')
     // Inline code
-    .replace(/`(.+?)`/g, '<code>$1</code>')
-    // Em dash shorthand
+    .replace(/`([^`\n]+?)`/g, '<code>$1</code>')
+    // Em dash
     .replace(/--/g, '—');
 }
 
